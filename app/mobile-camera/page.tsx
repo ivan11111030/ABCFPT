@@ -140,53 +140,55 @@ export default function MobileCameraPage() {
         </div>
         <div className="badge-row">
           <span className={`status-pill ${status === "connected" ? "active" : "offline"}`}>{connectionBadge}</span>
-          <span className={`status-pill ${streamState === "ready" ? "success" : streamState === "connecting" ? "pending" : streamState === "error" ? "error" : ""}`}>
-            {streamStateLabel}
-          </span>
         </div>
       </header>
 
       <section className="mobile-preview-card">
         <video ref={videoRef} autoPlay muted playsInline className="mobile-video-preview" />
-        <div className="mobile-preview-meta">
+        <div className="mobile-preview-overlay">
           <span>{streamStateLabel}</span>
-          <span>Signal: {signalStrength}</span>
+          <span className={`signal signal-${signalStrength}`}>● {signalStrength}</span>
         </div>
       </section>
 
-      <section className="mobile-control-panel">
-        <div className="control-row">
-          <button className="button primary" onClick={startLocalCamera} disabled={cameraEnabled}>
-            Activate Camera
-          </button>
+      <section className="mobile-controls">
+        <button className="button primary" onClick={startLocalCamera} disabled={cameraEnabled}>
+          Activate Camera
+        </button>
+
+        <div className="control-group">
           <button className="button subtle" onClick={switchCamera} disabled={!cameraEnabled}>
-            Switch Front / Rear
+            Switch Camera
           </button>
-        </div>
-        <div className="control-row">
-          <label>
-            Resolution
-            <select value={resolution} onChange={(event) => setResolution(event.target.value)}>
-              {resolutions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+
           <label>
             Audio
             <input type="checkbox" checked={audioEnabled} onChange={() => setAudioEnabled((current) => !current)} />
           </label>
         </div>
-        <div className="control-row">
-          <button className="button primary" onClick={connectStream} disabled={!cameraEnabled || streamState === "connecting" || status !== "connected"}>
-            Send Feed to Production
-          </button>
-          <button className="button outline" onClick={stopCamera} disabled={!cameraEnabled}>
-            Stop Camera
-          </button>
-        </div>
+
+        <label>
+          Resolution
+          <select value={resolution} onChange={(event) => setResolution(event.target.value)}>
+            {resolutions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <button
+          className="button broadcast"
+          onClick={connectStream}
+          disabled={!cameraEnabled || streamState === "connecting" || status !== "connected"}
+        >
+          GO LIVE
+        </button>
+
+        <button className="button outline" onClick={stopCamera} disabled={!cameraEnabled}>
+          Stop Camera
+        </button>
       </section>
     </main>
   );

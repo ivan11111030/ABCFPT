@@ -42,24 +42,36 @@ export function MobileCameraInvitePanel() {
       </div>
       <div className="camera-invite-grid">
         <div className="invite-card">
-          <label>
-            Camera name
+          <div className="invite-header">
+            <h3>Connect a Phone Camera</h3>
+            <p className="muted-note">
+              Scan the QR code using the phone you want to use as a camera.
+            </p>
+          </div>
+
+          <label className="camera-name-input">
+            Camera Name
             <input
               type="text"
               value={cameraName}
               onChange={(event) => setCameraName(event.target.value)}
-              placeholder="Phone Camera 1"
+              placeholder="Stage Phone Camera"
             />
           </label>
-          <p className="muted-note">Scan the QR code or copy the link to open the mobile camera page on the same network.</p>
-          <div className="qr-frame">
-            {qrData ? <img src={qrData} alt={`QR code for ${mobileLabel}`} /> : <div className="qr-fallback">Generating QR code…</div>}
+
+          <div className="qr-section">
+            {qrData ? (
+              <img src={qrData} alt={mobileLabel} />
+            ) : (
+              <div className="qr-fallback">Generating QR code…</div>
+            )}
           </div>
-          <div className="invite-actions">
-            <button type="button" className="button subtle" onClick={copyConnectionUrl} disabled={!connectionUrl}>
-              {copyStatus || "Copy invite link"}
+
+          <div className="invite-link">
+            <input value={connectionUrl} readOnly />
+            <button type="button" onClick={copyConnectionUrl} disabled={!connectionUrl}>
+              {copyStatus || "Copy"}
             </button>
-            <p className="connection-url">{connectionUrl}</p>
           </div>
         </div>
       </div>
