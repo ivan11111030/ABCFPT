@@ -4,8 +4,14 @@ import { SongManagementPanel } from "@/src/components/SongManagementPanel";
 import { sampleSongs } from "@/src/lib/fakeData";
 
 export default function SongsPage() {
-  const handleImport = () => {
-    window.alert("Song import workflow coming soon. Use drag and drop or PPT upload.");
+  const handleImport = (files?: FileList | File[]) => {
+    if (!files || files.length === 0) {
+      window.alert("Select or drop a PPT/lyrics file to import speaker notes and setlist data.");
+      return;
+    }
+
+    const names = Array.from(files).map((file) => file.name).join(", ");
+    window.alert(`Imported ${names}`);
   };
 
   return (

@@ -30,6 +30,7 @@ export default function ControlPage() {
   const [cameraTransition, setCameraTransition] = useState<CameraTransition>("cut");
   const [cameras, setCameras] = useState<Camera[]>(sampleCameras);
   const [connected, setConnected] = useState(false);
+  const [featureNavVisible, setFeatureNavVisible] = useState(true);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [rtmpUrl, setRtmpUrl] = useState("rtmp://live-api.facebook.com:80/rtmp/");
   const [streamKey, setStreamKey] = useState("");
@@ -50,6 +51,26 @@ export default function ControlPage() {
     socket.on("control:slide", (nextSlide: number) => setCurrentSlide(nextSlide));
     socket.on("control:camera", (cameraId: string) => setActiveCameraId(cameraId));
     socket.on("camera:list", (cameraList: Camera[]) => setCameras(cameraList));
+    socket.on("camera:added", (camera: Camera) => {
+      setCameras((prev) => (prev.some((item) => item.id === camera.id) ? prev : [...prev, camera]));
+    });
+    socket.on("mobile-camera:joined", (mobileCameraData: any) => {
+      setCameras((prev) => [
+        ...prev,
+        {
+          id: `mobile-${Date.now()}`,
+          name: `Mobile Camera (${mobileCameraData.device || "Remote"})`, 
+          protocol: "WebRTC",
+          ipAddress: "",
+          streamUrl: "webrtc://mobile",
+          status: "online",
+          supportsPTZ: false,
+          isMobile: true,
+          enabled: true,
+          signalStrength: "good",
+        },
+      ]);
+    });
 
     return () => {
       unsubscribeAuth();
@@ -59,6 +80,8 @@ export default function ControlPage() {
       socket.off("control:slide");
       socket.off("control:camera");
       socket.off("camera:list");
+      socket.off("camera:added");
+      socket.off("mobile-camera:joined");
     };
   }, [router]);
 
@@ -77,6 +100,24 @@ export default function ControlPage() {
   const changeTransition = (transition: CameraTransition) => {
     setCameraTransition(transition);
     socket.emit("control:camera:transition", transition);
+  };
+
+  const handleReorderSong = (sourceSongId: string, targetSongId: string) => {
+    const sourceIndex = songs.findIndex((song) => song.id === sourceSongId);
+    const targetIndex = songs.findIndex((song) => song.id === targetSongId);
+
+    if (sourceIndex === -1 || targetIndex === -1 || sourceIndex === targetIndex) {
+      return;
+    }
+
+    const nextSongs = [...songs];
+    const [movedSong] = nextSongs.splice(sourceIndex, 1);
+    nextSongs.splice(targetIndex, 0, movedSong);
+    setSongs(nextSongs);
+  };
+
+  const handleAddCamera = (camera: Camera) => {
+    setCameras((prev) => (prev.some((item) => item.id === camera.id) ? prev : [...prev, camera]));
   };
 
   const startStream = () => {
@@ -107,31 +148,51 @@ export default function ControlPage() {
   return (
     <div className="control-shell">
       <TopBar title="Production Control" badge={connected ? "Live Sync" : "Offline"} />
-      <div className="control-grid">
-        <SetlistPanel songs={songs} activeSongId={activeSongId} onSelectSong={setActiveSongId} />
-        <div className="control-main">
-          <LyricsPreviewPanel song={activeSong} currentSlide={currentSlide} />
-          <SlideControls onPrevious={() => triggerSlide("previous")} onNext={() => triggerSlide("next")} onJump={jumpToSection} />
-        </div>
-        <div className="control-sidebar">
-          <LivestreamStudioPanel
-            activeScene={activeScene}
-            activeCamera={cameras.find((camera) => camera.id === activeCameraId) ?? cameras[0]}
-            transition={cameraTransition}
-            isLive={isLive}
-            onStart={startStream}
-            onStop={stopStream}
-            onToggleOverlay={toggleOverlay}
-            onChangeRtmpUrl={setRtmpUrl}
-            onChangeStreamKey={setStreamKey}
-          />
-          <CameraPreviewPanel cameras={cameras} activeCameraId={activeCameraId} onSelectCamera={selectCamera} />
-          <CameraTransitionPanel transition={cameraTransition} onChangeTransition={changeTransition} />
-          <SceneControlPanel activeScene={activeScene} onSceneChange={triggerScene} />
-          <AudioMonitorPanel />
-          <CameraDiscoveryPanel />
-          <MobileCameraInvitePanel />
-          <SyncStatusBadge status={connected ? "connected" : "disconnected"} />
+      <div className="control-layout">
+        <aside className={`feature-nav ${featureNavVisible ? "open" : "collapsed"}`}>
+          <div className="panel-header">
+            <p>Core Navigation</p>
+            <button type="button" className="button subtle" onClick={() => setFeatureNavVisible((current) => !current)}>
+              {featureNavVisible ? "Hide" : "Show"}
+            </button>
+          </div>
+          {featureNavVisible ? (
+            <div className="feature-nav-list">
+              <button type="button" className="nav-item">Setlist</button>
+              <button type="button" className="nav-item">Lyrics Preview</button>
+              <button type="button" className="nav-item">Livestream Studio</button>
+              <button type="button" className="nav-item">Camera Preview</button>
+              <button type="button" className="nav-item">Mobile Camera</button>
+              <button type="button" className="nav-item">Projector Output</button>
+            </div>
+          ) : null}
+        </aside>
+        <div className="control-grid">
+          <SetlistPanel songs={songs} activeSongId={activeSongId} onSelectSong={setActiveSongId} onReorder={handleReorderSong} />
+          <div className="control-main">
+            <LyricsPreviewPanel song={activeSong} currentSlide={currentSlide} />
+            <SlideControls onPrevious={() => triggerSlide("previous")} onNext={() => triggerSlide("next")} onJump={jumpToSection} />
+          </div>
+          <div className="control-sidebar">
+            <LivestreamStudioPanel
+              activeScene={activeScene}
+              activeCamera={cameras.find((camera) => camera.id === activeCameraId) ?? cameras[0]}
+              transition={cameraTransition}
+              isLive={isLive}
+              onStart={startStream}
+              onStop={stopStream}
+              onToggleOverlay={toggleOverlay}
+              onChangeRtmpUrl={setRtmpUrl}
+              onChangeStreamKey={setStreamKey}
+            />
+            <CameraPreviewPanel cameras={cameras} activeCameraId={activeCameraId} onSelectCamera={selectCamera} />
+            <CameraTransitionPanel transition={cameraTransition} onChangeTransition={changeTransition} />
+            <SceneControlPanel activeScene={activeScene} onSceneChange={triggerScene} />
+            <AudioMonitorPanel />
+            <CameraDiscoveryPanel onAddCamera={handleAddCamera} />
+            <MobileCameraInvitePanel />
+            <SyncStatusBadge status={connected ? "connected" : "disconnected"} />
+          </div>
         </div>
       </div>
     </div>

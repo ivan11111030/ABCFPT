@@ -108,6 +108,18 @@ export default function MobileCameraPage() {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     socket.emit("mobile-camera:offer", offer);
+    socket.emit("camera:add", {
+      id: `camera-phone-${Date.now()}`,
+      name: `Phone Camera (${navigator.platform || "Mobile"})`,
+      protocol: "WebRTC",
+      ipAddress: "",
+      streamUrl: "webrtc://mobile",
+      status: "online",
+      supportsPTZ: false,
+      isMobile: true,
+      enabled: true,
+      signalStrength: "good",
+    });
     setStreamState("connecting");
   };
 

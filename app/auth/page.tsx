@@ -80,6 +80,14 @@ export default function AuthPage() {
   return (
     <main className="auth-shell">
       <section className="auth-card">
+        <div className="logo-row">
+          <div className="logo-box">
+            <img src="/logo-left.svg" alt="ABCF logo left" />
+          </div>
+          <div className="logo-box">
+            <img src="/logo-right.svg" alt="ABCF logo right" />
+          </div>
+        </div>
         <div className="panel-header">
           <p>{mode === "login" ? "Sign In" : "Create Account"}</p>
           <button type="button" className="button subtle" onClick={() => setMode(mode === "login" ? "register" : "login")}> 

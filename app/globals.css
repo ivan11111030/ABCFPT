@@ -500,6 +500,7 @@ p {
 .logo-row {
   display: flex;
   gap: 16px;
+  justify-content: center;
   flex-wrap: wrap;
   align-items: center;
   margin-bottom: 24px;
@@ -574,12 +575,89 @@ p {
   margin: 0 auto;
 }
 
+.control-page-grid,
+.control-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 20px;
+}
+
 .control-grid {
   display: grid;
   gap: 20px;
   grid-template-columns: 280px minmax(0, 1fr) 320px;
   align-items: start;
   margin-top: 20px;
+}
+
+.feature-nav {
+  display: grid;
+  gap: 18px;
+  background: rgba(30, 41, 59, 0.95);
+  border: 1px solid rgba(79, 195, 247, 0.18);
+  border-radius: 24px;
+  padding: 20px;
+  min-width: 260px;
+}
+
+.feature-nav.collapsed {
+  width: 72px;
+  min-width: 72px;
+  overflow: hidden;
+}
+
+.feature-nav-list {
+  display: grid;
+  gap: 10px;
+}
+
+.nav-item {
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+
+.nav-item:hover {
+  background: rgba(79, 195, 247, 0.12);
+}
+
+.drop-zone {
+  border: 2px dashed rgba(79, 195, 247, 0.3);
+  border-radius: 20px;
+  min-height: 120px;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.9);
+  color: var(--muted);
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.drop-zone.drag-over {
+  background: rgba(79, 195, 247, 0.12);
+  border-color: var(--accent);
+}
+
+.import-list {
+  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid rgba(79, 195, 247, 0.12);
+  border-radius: 20px;
+  padding: 18px 20px;
+}
+
+.import-list ul {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--text);
+}
+
+.dragging {
+  opacity: 0.7;
 }
 
 .setlist-panel {
