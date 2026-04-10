@@ -123,20 +123,33 @@ export default function MobileCameraPage() {
     return "Unknown";
   }, [status]);
 
+  const streamStateLabel = useMemo(() => {
+    if (streamState === "ready") return "Camera ready";
+    if (streamState === "connecting") return "Connecting...";
+    if (streamState === "starting") return "Starting camera";
+    if (streamState === "error") return "Camera error";
+    return "Camera inactive";
+  }, [streamState]);
+
   return (
     <main className="mobile-camera-shell">
-      <header className="panel-header">
+      <header className="panel-header preview-header">
         <div>
           <p className="eyebrow">Mobile Camera</p>
           <h1>Use this phone as a wireless livestream camera.</h1>
         </div>
-        <span className="status-pill">{connectionBadge}</span>
+        <div className="badge-row">
+          <span className={`status-pill ${status === "connected" ? "active" : "offline"}`}>{connectionBadge}</span>
+          <span className={`status-pill ${streamState === "ready" ? "success" : streamState === "connecting" ? "pending" : streamState === "error" ? "error" : ""}`}>
+            {streamStateLabel}
+          </span>
+        </div>
       </header>
 
       <section className="mobile-preview-card">
         <video ref={videoRef} autoPlay muted playsInline className="mobile-video-preview" />
         <div className="mobile-preview-meta">
-          <span>{streamState === "ready" ? "Camera ready" : streamState === "connecting" ? "Connecting..." : "Camera inactive"}</span>
+          <span>{streamStateLabel}</span>
           <span>Signal: {signalStrength}</span>
         </div>
       </section>
@@ -167,7 +180,7 @@ export default function MobileCameraPage() {
           </label>
         </div>
         <div className="control-row">
-          <button className="button primary" onClick={connectStream} disabled={!cameraEnabled || streamState === "connecting"}>
+          <button className="button primary" onClick={connectStream} disabled={!cameraEnabled || streamState === "connecting" || status !== "connected"}>
             Send Feed to Production
           </button>
           <button className="button outline" onClick={stopCamera} disabled={!cameraEnabled}>
