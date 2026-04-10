@@ -1,0 +1,40 @@
+{
+  "name": "abcf-production-team",
+  "version": "0.1.0",
+  "homepage": "https://ivan11111030.github.io/ABCFPT",
+  "private": true,
+  "scripts": {
+    "dev:web": "next dev",
+    "dev:server": "ts-node-dev --respawn --transpile-only server/index.ts",
+    "dev": "concurrently \"npm:dev:web\" \"npm:dev:server\"",
+    "build": "next build",
+    "export": "next build",
+    "deploy": "npm run build && gh-pages -d out",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "express": "^4.18.3",
+    "firebase": "^10.13.0",
+    "next": "14.2.5",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "socket.io": "^4.7.2",
+    "socket.io-client": "^4.7.2",
+    "swr": "^2.3.0",
+    "qrcode": "^1.5.1"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.20",
+    "@types/node": "^20.12.0",
+    "@types/socket.io": "^3.0.2",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.1",
+    "concurrently": "^8.2.2",
+    "gh-pages": "^5.0.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.6.2"
+  }
+}
