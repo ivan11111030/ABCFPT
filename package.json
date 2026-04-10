@@ -8,8 +8,8 @@
     "dev:server": "ts-node-dev --respawn --transpile-only server/index.ts",
     "dev": "concurrently \"npm:dev:web\" \"npm:dev:server\"",
     "build": "next build",
-    "export": "next build && next export",
-    "deploy": "npm run export && gh-pages -d out",
+    "export": "next build",
+    "deploy": "npm run build && gh-pages -d out",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"
