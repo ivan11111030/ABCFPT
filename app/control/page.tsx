@@ -15,6 +15,7 @@ import { CameraTransitionPanel } from "@/src/components/CameraTransitionPanel";
 import { CameraDiscoveryPanel } from "@/src/components/CameraDiscoveryPanel";
 import { MobileCameraInvitePanel } from "@/src/components/MobileCameraInvitePanel";
 import { LivestreamStudioPanel } from "@/src/components/LivestreamStudioPanel";
+import { LocalCameraPanel } from "@/src/components/LocalCameraPanel";
 import { createSocketClient } from "@/src/lib/socket";
 import { sampleCameras, sampleSongs } from "@/src/lib/fakeData";
 import type { Camera, CameraTransition, SceneMode, Song } from "@/src/types/production";
@@ -138,6 +139,16 @@ export default function ControlPage() {
 
   const handleAddCamera = (camera: Camera) => {
     setCameras((prev) => (prev.some((item) => item.id === camera.id) ? prev : [...prev, camera]));
+  };
+
+  const handleRemoveCamera = (cameraId: string) => {
+    setCameras((prev) => prev.filter((c) => c.id !== cameraId));
+    if (activeCameraId === cameraId) {
+      setActiveCameraId(cameras[0]?.id ?? "");
+    }
+    if (previewCameraId === cameraId) {
+      setPreviewCameraId(cameras[0]?.id ?? "");
+    }
   };
 
   const startStream = () => {
@@ -267,7 +278,7 @@ export default function ControlPage() {
         {/* RIGHT: PRODUCTION CONTROLS */}
         {showRightPanel && (
         <div className="control-right">
-          <CameraPreviewPanel cameras={cameras} activeCameraId={previewCameraId} onSelectCamera={selectCamera} />
+          <CameraPreviewPanel cameras={cameras} activeCameraId={previewCameraId} onSelectCamera={selectCamera} onRemoveCamera={handleRemoveCamera} />
           <CameraTransitionPanel transition={cameraTransition} onChangeTransition={changeTransition} />
           <SceneControlPanel activeScene={activeScene} onSceneChange={triggerScene} />
           <LivestreamStudioPanel
@@ -283,6 +294,7 @@ export default function ControlPage() {
           />
           <AudioMonitorPanel />
           <CameraDiscoveryPanel onAddCamera={handleAddCamera} />
+          <LocalCameraPanel onAddCamera={handleAddCamera} />
           <MobileCameraInvitePanel />
           <SyncStatusBadge status={connected ? "connected" : "disconnected"} />
         </div>

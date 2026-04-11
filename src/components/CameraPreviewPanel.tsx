@@ -4,9 +4,10 @@ type CameraPreviewPanelProps = {
   cameras: Camera[];
   activeCameraId: string;
   onSelectCamera: (cameraId: string) => void;
+  onRemoveCamera?: (cameraId: string) => void;
 };
 
-export function CameraPreviewPanel({ cameras, activeCameraId, onSelectCamera }: CameraPreviewPanelProps) {
+export function CameraPreviewPanel({ cameras, activeCameraId, onSelectCamera, onRemoveCamera }: CameraPreviewPanelProps) {
   return (
     <section className="camera-panel">
       <div className="panel-header">
@@ -15,25 +16,36 @@ export function CameraPreviewPanel({ cameras, activeCameraId, onSelectCamera }: 
       </div>
       <div className="camera-grid">
         {cameras.map((camera) => (
-          <button
-            key={camera.id}
-            type="button"
-            className={camera.id === activeCameraId ? "camera-card active" : "camera-card"}
-            onClick={() => onSelectCamera(camera.id)}
-          >
-            <div className="camera-thumbnail" aria-hidden="true">
-              <span>{camera.isMobile ? "📱" : camera.supportsPTZ ? "🎥" : "📷"}</span>
-            </div>
-            <div className="camera-meta">
-              <strong>{camera.name}</strong>
-              <small>{camera.protocol}{camera.isMobile ? " • Mobile" : ""}</small>
-              <div className="camera-footer">
-                <span className={camera.status === "online" ? "status online" : camera.status === "offline" ? "status offline" : "status unknown"}>
-                  {camera.status === "online" ? "🟢" : camera.status === "offline" ? "🔴" : "🟡"} {camera.status}
-                </span>
+          <div key={camera.id} className={camera.id === activeCameraId ? "camera-card active" : "camera-card"} style={{ position: "relative" }}>
+            {onRemoveCamera && (
+              <button
+                type="button"
+                className="camera-remove-btn"
+                title="Remove camera"
+                onClick={(e) => { e.stopPropagation(); onRemoveCamera(camera.id); }}
+              >
+                ✕
+              </button>
+            )}
+            <button
+              type="button"
+              className="camera-card-inner"
+              onClick={() => onSelectCamera(camera.id)}
+            >
+              <div className="camera-thumbnail" aria-hidden="true">
+                <span>{camera.streamUrl?.startsWith("local://") ? "💻" : camera.isMobile ? "📱" : camera.supportsPTZ ? "🎥" : "📷"}</span>
               </div>
-            </div>
-          </button>
+              <div className="camera-meta">
+                <strong>{camera.name}</strong>
+                <small>{camera.protocol}{camera.isMobile ? " • Mobile" : camera.streamUrl?.startsWith("local://") ? " • USB" : ""}</small>
+                <div className="camera-footer">
+                  <span className={camera.status === "online" ? "status online" : camera.status === "offline" ? "status offline" : "status unknown"}>
+                    {camera.status === "online" ? "🟢" : camera.status === "offline" ? "🔴" : "🟡"} {camera.status}
+                  </span>
+                </div>
+              </div>
+            </button>
+          </div>
         ))}
       </div>
     </section>
