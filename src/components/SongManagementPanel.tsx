@@ -170,12 +170,12 @@ export function SongManagementPanel({ songs, onImportSong, onAddSong, onUpdateSo
         onDragLeave={() => setDragging(false)}
         onDrop={handleDrop}
       >
-        <p>Drop .txt or .lrc files here to import lyrics. (PPT/PPTX: save as .txt first)</p>
+        <p>Drop .txt, .lrc, or .pptx files here to import lyrics</p>
       </div>
       <input
         ref={fileInputRef}
         type="file"
-        accept=".txt,.lrc"
+        accept=".txt,.lrc,.pptx"
         multiple
         hidden
         onChange={(event) => handleFileSelect(event.target.files)}

@@ -16,6 +16,7 @@ import { CameraDiscoveryPanel } from "@/src/components/CameraDiscoveryPanel";
 import { MobileCameraInvitePanel } from "@/src/components/MobileCameraInvitePanel";
 import { LivestreamStudioPanel } from "@/src/components/LivestreamStudioPanel";
 import { LocalCameraPanel } from "@/src/components/LocalCameraPanel";
+import { SongManagementPanel } from "@/src/components/SongManagementPanel";
 import { DraggableOverlay, LAYOUT_PRESETS, type OverlayLayout, type OverlayPosition } from "@/src/components/DraggableOverlay";
 import { createSocketClient } from "@/src/lib/socket";
 import { sampleCameras, sampleSongs } from "@/src/lib/fakeData";
@@ -48,6 +49,7 @@ export default function ControlPage() {
   const [background, setBackground] = useState<{ type: "color" | "image"; value: string }>({ type: "color", value: "#000000" });
   const [streamStatus, setStreamStatus] = useState("");
   const [programFlash, setProgramFlash] = useState(false);
+  const [showSongManager, setShowSongManager] = useState(false);
   const [leftWidth, setLeftWidth] = useState(280);
   const [rightWidth, setRightWidth] = useState(320);
   const [showRightPanel, setShowRightPanel] = useState(true);
@@ -270,6 +272,19 @@ export default function ControlPage() {
     socket.emit("song:reorder", nextSongs.map((s) => s.id));
   };
 
+  const handleImportSong = async (files: FileList | File[]) => {
+    for (const file of Array.from(files)) {
+      try {
+        const song = await parseFile(file);
+        if (song) socket.emit("song:add", song);
+      } catch { /* skip */ }
+    }
+  };
+
+  const handleAddSong = (song: Song) => socket.emit("song:add", song);
+  const handleUpdateSong = (song: Song) => socket.emit("song:update", song);
+  const handleDeleteSong = (songId: string) => socket.emit("song:delete", songId);
+
   const handleAddCamera = (camera: Camera, stream?: MediaStream) => {
     setCameras((prev) => (prev.some((item) => item.id === camera.id) ? prev : [...prev, camera]));
     if (stream) {
@@ -472,6 +487,9 @@ export default function ControlPage() {
         {/* LEFT: SETLIST */}
         <div className="control-left">
           <SetlistPanel songs={songs} activeSongId={activeSongId} onSelectSong={selectSong} onReorder={handleReorderSong} />
+          <button type="button" className="button outline" style={{ width: "100%", marginTop: 8, fontSize: 12 }} onClick={() => setShowSongManager(true)}>
+            ✏️ Edit Songs / Import PPT
+          </button>
         </div>
 
         {/* LEFT RESIZE HANDLE */}
@@ -617,6 +635,25 @@ export default function ControlPage() {
           Scene: {activeScene}
         </button>
       </div>
+
+      {/* SONG MANAGER MODAL */}
+      {showSongManager && (
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowSongManager(false); }}>
+          <div className="modal-content">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h2 style={{ margin: 0, fontSize: 18 }}>Song Manager</h2>
+              <button type="button" className="button subtle" onClick={() => setShowSongManager(false)}>✕ Close</button>
+            </div>
+            <SongManagementPanel
+              songs={songs}
+              onImportSong={handleImportSong}
+              onAddSong={handleAddSong}
+              onUpdateSong={handleUpdateSong}
+              onDeleteSong={handleDeleteSong}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

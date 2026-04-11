@@ -1,4 +1,5 @@
 import type { Slide, Song } from "@/src/types/production";
+import JSZip from "jszip";
 
 export function parseTxtFile(content: string, fileName: string): Song {
   const title = fileName.replace(/\.txt$/i, "").replace(/[-_]/g, " ");
@@ -105,8 +106,72 @@ export function parseLrcFile(content: string, fileName: string): Song {
   };
 }
 
+export async function parsePptxFile(file: File): Promise<Song> {
+  const title = file.name.replace(/\.pptx?$/i, "").replace(/[-_]/g, " ");
+  const zip = await JSZip.loadAsync(file);
+  const slides: Slide[] = [];
+
+  // PPTX slides are in ppt/slides/slide1.xml, slide2.xml, etc.
+  const slideEntries: { num: number; path: string }[] = [];
+  zip.forEach((relativePath) => {
+    const match = relativePath.match(/^ppt\/slides\/slide(\d+)\.xml$/);
+    if (match) {
+      slideEntries.push({ num: parseInt(match[1], 10), path: relativePath });
+    }
+  });
+
+  // Sort by slide number
+  slideEntries.sort((a, b) => a.num - b.num);
+
+  for (const entry of slideEntries) {
+    const xmlContent = await zip.file(entry.path)?.async("text");
+    if (!xmlContent) continue;
+
+    // Extract all text from <a:t> tags in the slide XML
+    const textParts: string[] = [];
+    const textRegex = /<a:t>([\s\S]*?)<\/a:t>/g;
+    let match: RegExpExecArray | null;
+    while ((match = textRegex.exec(xmlContent)) !== null) {
+      const text = match[1].trim();
+      if (text) textParts.push(text);
+    }
+
+    const slideText = textParts.join("\n").trim();
+    if (slideText) {
+      slides.push({
+        id: `slide-pptx-${Date.now()}-${slides.length}`,
+        section: `Slide ${slides.length + 1}`,
+        text: slideText,
+      });
+    }
+  }
+
+  // If no slides extracted, create a placeholder
+  if (slides.length === 0) {
+    slides.push({
+      id: `slide-pptx-${Date.now()}-0`,
+      section: "Slide 1",
+      text: "(No text content found in presentation)",
+    });
+  }
+
+  return {
+    id: `song-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    title,
+    artist: "Imported from PPT",
+    key: "C",
+    tempo: 0,
+    currentSection: slides[0]?.section || "Slide 1",
+    slides,
+    favorite: false,
+  };
+}
+
 export async function parseFile(file: File): Promise<Song | null> {
   const ext = file.name.split(".").pop()?.toLowerCase();
+
+  if (ext === "pptx") return parsePptxFile(file);
+
   const content = await file.text();
 
   if (ext === "txt") return parseTxtFile(content, file.name);

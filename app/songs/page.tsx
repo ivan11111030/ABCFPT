@@ -33,18 +33,12 @@ export default function SongsPage() {
     const errors: string[] = [];
 
     for (const file of Array.from(files)) {
-      const ext = file.name.split(".").pop()?.toLowerCase();
-      if (ext === "ppt" || ext === "pptx") {
-        errors.push(`${file.name}: PPT/PPTX binary format not supported. Please save as .txt first.`);
-        continue;
-      }
-
       try {
         const song = await parseFile(file);
         if (song) {
           imported.push(song);
         } else {
-          errors.push(`${file.name}: Unsupported file format.`);
+          errors.push(`${file.name}: Unsupported file format. Use .txt, .lrc, or .pptx.`);
         }
       } catch {
         errors.push(`${file.name}: Error reading file.`);
