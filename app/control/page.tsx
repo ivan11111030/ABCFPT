@@ -19,6 +19,7 @@ import { LocalCameraPanel } from "@/src/components/LocalCameraPanel";
 import { DraggableOverlay, LAYOUT_PRESETS, type OverlayLayout, type OverlayPosition } from "@/src/components/DraggableOverlay";
 import { createSocketClient } from "@/src/lib/socket";
 import { sampleCameras, sampleSongs } from "@/src/lib/fakeData";
+import { parseFile } from "@/src/lib/songParser";
 import type { Camera, CameraTransition, SceneMode, Song } from "@/src/types/production";
 
 const socket = createSocketClient();
@@ -43,6 +44,9 @@ export default function ControlPage() {
   const [rtmpUrl, setRtmpUrl] = useState("rtmp://live-api.facebook.com:80/rtmp/");
   const [streamKey, setStreamKey] = useState("");
   const [isLive, setIsLive] = useState(false);
+  const [standby, setStandby] = useState(false);
+  const [background, setBackground] = useState<{ type: "color" | "image"; value: string }>({ type: "color", value: "#000000" });
+  const [streamStatus, setStreamStatus] = useState("");
   const [leftWidth, setLeftWidth] = useState(280);
   const [rightWidth, setRightWidth] = useState(320);
   const [showRightPanel, setShowRightPanel] = useState(true);
@@ -69,16 +73,38 @@ export default function ControlPage() {
 
     socket.on("connect", () => setConnected(true));
     socket.on("disconnect", () => setConnected(false));
-    socket.on("device:update", () => setConnected(true));
-    socket.on("control:slide", (nextSlide: number) => setCurrentSlide(nextSlide));
-    socket.on("control:camera", (cameraId: string) => setActiveCameraId(cameraId));
-    socket.on("camera:list", (cameraList: Camera[]) => setCameras(cameraList));
-    socket.on("camera:added", (camera: Camera) => {
-      setCameras((prev) => {
-        if (prev.some((item) => item.id === camera.id)) return prev;
-        return [...prev, { ...camera, status: "online" as const }];
-      });
+
+    // Full state sync from server on connect
+    socket.on("state:sync", (serverState: any) => {
+      setConnected(true);
+      if (serverState.songs?.length) setSongs(serverState.songs);
+      if (serverState.currentSongId) setActiveSongId(serverState.currentSongId);
+      if (serverState.currentSlide !== undefined) setCurrentSlide(serverState.currentSlide);
+      if (serverState.currentScene) setActiveScene(serverState.currentScene);
+      if (serverState.cameras?.length) setCameras(serverState.cameras);
+      if (serverState.activeCameraId) setActiveCameraId(serverState.activeCameraId);
+      if (serverState.cameraTransition) setCameraTransition(serverState.cameraTransition);
+      if (serverState.isLive !== undefined) setIsLive(serverState.isLive);
+      if (serverState.overlayEnabled !== undefined) setOverlayEnabled(serverState.overlayEnabled);
+      if (serverState.overlayPosition) setOverlayPos(serverState.overlayPosition);
+      if (serverState.standby !== undefined) setStandby(serverState.standby);
+      if (serverState.background) setBackground(serverState.background);
     });
+
+    // Live updates
+    socket.on("control:slide", (nextSlide: number) => setCurrentSlide(nextSlide));
+    socket.on("control:song", (songId: string) => { setActiveSongId(songId); setCurrentSlide(0); });
+    socket.on("control:camera", (cameraId: string) => setActiveCameraId(cameraId));
+    socket.on("control:scene", (payload: any) => { const scene = typeof payload === "string" ? payload : payload.scene; if (scene) setActiveScene(scene); });
+    socket.on("camera:list", (cameraList: Camera[]) => setCameras(cameraList));
+    socket.on("song:list", (songList: Song[]) => setSongs(songList));
+    socket.on("stream:started", () => { setIsLive(true); setStreamStatus("Live"); });
+    socket.on("stream:stopped", () => { setIsLive(false); setStreamStatus("Stopped"); });
+    socket.on("stream:error", (err: { message: string }) => { setStreamStatus(err.message); setIsLive(false); });
+    socket.on("control:standby", (enabled: boolean) => setStandby(enabled));
+    socket.on("control:background", (bg: { type: "color" | "image"; value: string }) => setBackground(bg));
+    socket.on("stream:overlayToggled", (payload: { enabled: boolean }) => setOverlayEnabled(payload.enabled));
+    socket.on("stream:overlayPosition", (pos: any) => setOverlayPos(pos));
     socket.on("mobile-camera:joined", (mobileCameraData: any) => {
       const mobileId = mobileCameraData.cameraId || `mobile-${Date.now()}`;
       const mobileName = mobileCameraData.cameraName || `Mobile Camera (${mobileCameraData.device || "Remote"})`;
@@ -158,17 +184,24 @@ export default function ControlPage() {
       unsubscribeAuth();
       socket.off("connect");
       socket.off("disconnect");
-      socket.off("device:update");
+      socket.off("state:sync");
       socket.off("control:slide");
+      socket.off("control:song");
       socket.off("control:camera");
+      socket.off("control:scene");
       socket.off("camera:list");
-      socket.off("camera:added");
+      socket.off("song:list");
+      socket.off("stream:started");
+      socket.off("stream:stopped");
+      socket.off("stream:error");
+      socket.off("control:standby");
+      socket.off("control:background");
+      socket.off("stream:overlayToggled");
+      socket.off("stream:overlayPosition");
       socket.off("mobile-camera:joined");
       socket.off("mobile-camera:offer");
       socket.off("mobile-camera:candidate");
-
-      Object.values(peerConnectionsRef.current).forEach((pc) => pc.close());
-      peerConnectionsRef.current = {};
+      // NOTE: Do NOT close peer connections on unmount to preserve camera connections
     };
   }, [router]);
 
@@ -179,6 +212,26 @@ export default function ControlPage() {
   const triggerScene = (scene: SceneMode) => {
     setActiveScene(scene);
     socket.emit("control:scene", { scene, cameraId: activeCameraId, transition: cameraTransition });
+    // Scene presets: adjust overlay based on scene
+    if (scene === "lyrics") {
+      setOverlayEnabled(true);
+      socket.emit("stream:toggleOverlay", { enabled: true });
+    } else if (scene === "speaker") {
+      setOverlayEnabled(false);
+      socket.emit("stream:toggleOverlay", { enabled: false });
+    }
+  };
+
+  const toggleStandby = () => {
+    const next = !standby;
+    setStandby(next);
+    socket.emit("control:standby", next);
+  };
+
+  const changeBackground = (type: "color" | "image", value: string) => {
+    const bg = { type, value };
+    setBackground(bg);
+    socket.emit("control:background", bg);
   };
 
   const selectSong = (songId: string) => {
@@ -211,6 +264,7 @@ export default function ControlPage() {
     const [movedSong] = nextSongs.splice(sourceIndex, 1);
     nextSongs.splice(targetIndex, 0, movedSong);
     setSongs(nextSongs);
+    socket.emit("song:reorder", nextSongs.map((s) => s.id));
   };
 
   const handleAddCamera = (camera: Camera, stream?: MediaStream) => {
@@ -279,13 +333,17 @@ export default function ControlPage() {
   }, [localStreams]);
 
   const startStream = () => {
-    setIsLive(true);
+    if (!streamKey.trim()) {
+      setStreamStatus("Error: Stream Key is required");
+      return;
+    }
+    setStreamStatus("Connecting...");
     socket.emit("stream:start", { rtmpUrl, streamKey, scene: activeScene, cameraId: activeCameraId });
   };
 
   const stopStream = () => {
-    setIsLive(false);
     socket.emit("stream:stop", { scene: activeScene, cameraId: activeCameraId });
+    setStreamStatus("");
   };
 
   const toggleOverlay = () => {
@@ -478,12 +536,26 @@ export default function ControlPage() {
             activeCamera={activeCamera}
             transition={cameraTransition}
             isLive={isLive}
+            streamStatus={streamStatus}
             onStart={startStream}
             onStop={stopStream}
             onToggleOverlay={toggleOverlay}
             onChangeRtmpUrl={setRtmpUrl}
             onChangeStreamKey={setStreamKey}
           />
+          {/* Standby & Background */}
+          <section className="scene-panel">
+            <div className="panel-header"><p>Standby &amp; Background</p></div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+              <button type="button" className={`button ${standby ? "danger" : "outline"}`} style={{ flex: 1 }} onClick={toggleStandby}>
+                {standby ? "⏸ Standby ON" : "▶ Go Live View"}
+              </button>
+            </div>
+            <label style={{ display: "block", marginBottom: 6, fontSize: 12, color: "var(--muted)" }}>
+              Background Color
+              <input type="color" value={background.value} onChange={(e) => changeBackground("color", e.target.value)} style={{ width: "100%", height: 32, border: "none", borderRadius: 6, cursor: "pointer" }} />
+            </label>
+          </section>
           <AudioMonitorPanel />
           <CameraDiscoveryPanel onAddCamera={handleAddCamera} />
           <LocalCameraPanel onAddCamera={handleAddCamera} />
