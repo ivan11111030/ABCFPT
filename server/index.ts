@@ -4,6 +4,11 @@ import { Server, type Socket } from "socket.io";
 
 const app = express();
 const port = Number(process.env.PORT) || 4000;
+const publicHost = process.env.PUBLIC_HOST || `http://localhost:${port}`;
+const corsOrigins = (process.env.CLIENT_ORIGIN || "*")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 const server = http.createServer(app);
 
 /* ── Types ──────────────────────────────────────────── */
@@ -62,7 +67,14 @@ const state = {
 
 /* ── Socket.io ──────────────────────────────────────── */
 const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] },
+  cors: {
+    origin: corsOrigins.length === 1 && corsOrigins[0] === "*" ? "*" : corsOrigins,
+    methods: ["GET", "POST"],
+  },
+});
+
+app.get("/", (_req: Request, res: Response) => {
+  res.json({ service: "abcfpt-socket", status: "ok", timestamp: Date.now() });
 });
 
 app.get("/status", (_req: Request, res: Response) => {
@@ -265,5 +277,6 @@ io.on("connection", (socket: Socket) => {
 });
 
 server.listen(port, () => {
-  console.log(`Socket server is running on http://localhost:${port}`);
+  console.log(`Socket server is running on ${publicHost}`);
+  console.log(`Socket CORS origin(s): ${corsOrigins.join(", ")}`);
 });

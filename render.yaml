@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: abcfpt-socket
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm run server:start
+    healthCheckPath: /status
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: PUBLIC_HOST
+        sync: false
+      - key: CLIENT_ORIGIN
+        value: https://ivan11111030.github.io
