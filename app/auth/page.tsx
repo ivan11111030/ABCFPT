@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -21,6 +22,8 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const user = useAuth();
   const router = useRouter();
+
+  const isSubmitDisabled = loading || !email.trim() || !password.trim();
 
   useEffect(() => {
     if (user) {
@@ -80,33 +83,58 @@ export default function AuthPage() {
   return (
     <main className="auth-shell">
       <section className="auth-card">
-        <div className="logo-row">
-          <div className="logo-box">
-            <img src="/logo-left.svg" alt="ABCF logo left" />
+        <header className="auth-brand-row">
+          <div className="logo-row" aria-label="ABCF brand mark">
+            <div className="logo-box">
+              <Image src="/logo-left.png" alt="ABCF logo left" width={120} height={120} priority />
+            </div>
+            <div className="logo-box logo-box-wide">
+              <Image src="/logo-right.png" alt="ABCF logo right" width={120} height={120} priority />
+            </div>
           </div>
-          <div className="logo-box">
-            <img src="/logo-right.svg" alt="ABCF logo right" />
+          <div className="auth-title-block">
+            <h1>{mode === "login" ? "Welcome Back" : "Create Your Account"}</h1>
+            <p>Sign in to manage your livestream scenes, lyrics, and camera routing.</p>
           </div>
-        </div>
+        </header>
+
         <div className="panel-header">
-          <p>{mode === "login" ? "Sign In" : "Create Account"}</p>
+          <p>{mode === "login" ? "Sign In" : "Register"}</p>
           <button type="button" className="button subtle" onClick={() => setMode(mode === "login" ? "register" : "login")}> 
             {mode === "login" ? "Create account" : "Sign in"}
           </button>
         </div>
 
-        <div className="auth-form">
+        <form className="auth-form" onSubmit={(event) => {
+          event.preventDefault();
+          void handleAuth();
+        }}>
           <label>
             Email
-            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" />
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="you@example.com"
+              autoComplete="email"
+              required
+            />
           </label>
           <label>
             Password
-            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" />
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Password"
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              minLength={6}
+              required
+            />
           </label>
           <div className="auth-actions">
-            <button type="button" className="button primary" onClick={handleAuth} disabled={loading}>
-              {mode === "login" ? "Sign In" : "Register"}
+            <button type="submit" className="button primary" disabled={isSubmitDisabled}>
+              {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Register"}
             </button>
             {mode === "login" && (
               <button type="button" className="button subtle" onClick={handleResetPassword} disabled={loading}>
@@ -115,7 +143,7 @@ export default function AuthPage() {
             )}
           </div>
           <button type="button" className="button secondary" onClick={handleGoogleSignIn} disabled={loading}>
-            Sign in with Google
+            Continue with Google
           </button>
           {message ? <p className="message">{message}</p> : null}
           {user ? (
@@ -126,7 +154,7 @@ export default function AuthPage() {
               </button>
             </div>
           ) : null}
-        </div>
+        </form>
       </section>
     </main>
   );
