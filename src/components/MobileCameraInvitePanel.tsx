@@ -11,12 +11,14 @@ export function MobileCameraInvitePanel() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const mobileUrl = new URL("../mobile-camera", window.location.href).toString();
-    setConnectionUrl(mobileUrl);
-    QRCode.toDataURL(mobileUrl)
+    const base = new URL("../mobile-camera", window.location.href);
+    base.searchParams.set("name", cameraName);
+    const url = base.toString();
+    setConnectionUrl(url);
+    QRCode.toDataURL(url)
       .then(setQrData)
       .catch(() => setQrData(""));
-  }, []);
+  }, [cameraName]);
 
   const copyConnectionUrl = async () => {
     if (!connectionUrl) return;

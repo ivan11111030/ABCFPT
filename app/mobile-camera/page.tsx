@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { createSocketClient } from "@/src/lib/socket";
 
 const socket = createSocketClient();
@@ -11,6 +12,16 @@ const resolutions = [
 ];
 
 export default function MobileCameraPage() {
+  return (
+    <Suspense fallback={<div style={{ display: "grid", placeItems: "center", minHeight: "100vh", color: "var(--muted)" }}>Loading camera...</div>}>
+      <MobileCameraInner />
+    </Suspense>
+  );
+}
+
+function MobileCameraInner() {
+  const searchParams = useSearchParams();
+  const cameraName = searchParams.get("name") || "Phone Camera";
   const [status, setStatus] = useState("disconnected");
   const [streamState, setStreamState] = useState("idle");
   const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
@@ -27,6 +38,7 @@ export default function MobileCameraPage() {
       setStatus("connected");
       socket.emit("mobile-camera:join", {
         device: navigator.userAgent,
+        cameraName,
         supportedResolutions: ["720p", "1080p"],
       });
     });
@@ -111,7 +123,7 @@ export default function MobileCameraPage() {
     socket.emit("mobile-camera:offer", offer);
     socket.emit("camera:add", {
       id: `camera-phone-${Date.now()}`,
-      name: `Phone Camera (${navigator.platform || "Mobile"})`,
+      name: cameraName,
       protocol: "WebRTC",
       ipAddress: "",
       streamUrl: "webrtc://mobile",
@@ -154,7 +166,7 @@ export default function MobileCameraPage() {
     <main className="mobile-camera-shell">
       {/* Header */}
       <div className="mobile-camera-header">
-        <h1>Mobile Camera</h1>
+        <h1>{cameraName}</h1>
         <p>{connectionBadge}</p>
         <span className={`status-pill ${status === "connected" ? "active" : "offline"}`}>
           {status === "connected" ? "🟢" : "🔴"} {status}

@@ -284,7 +284,34 @@ h1, h2, h3, p { margin: 0; }
 .topbar-left {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
+  gap: var(--sp-2);
+}
+
+.topbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: var(--sp-1);
+}
+
+.topbar-nav-link {
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: var(--font-label);
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+.topbar-nav-link:hover {
+  background: rgba(79, 195, 247, 0.1);
+  color: var(--text);
+}
+
+.topbar-toggle {
+  padding: 6px 12px !important;
+  font-size: var(--font-label) !important;
 }
 
 .topbar-title {
@@ -331,10 +358,25 @@ h1, h2, h3, p { margin: 0; }
 
 .control-body {
   display: grid;
-  grid-template-columns: 280px 1fr 320px;
+  grid-template-columns: 280px 6px 1fr 6px 320px;
   gap: 0;
   overflow: hidden;
   height: calc(100vh - 56px - 52px);
+}
+
+.resize-handle {
+  width: 6px;
+  cursor: col-resize;
+  background: transparent;
+  position: relative;
+  z-index: 10;
+  transition: background 0.15s;
+}
+
+.resize-handle:hover,
+.resize-handle:active {
+  background: var(--accent);
+  opacity: 0.5;
 }
 
 .control-left {
@@ -1510,8 +1552,12 @@ h1, h2, h3, p { margin: 0; }
 /* ========== RESPONSIVE: TABLET ========== */
 @media (max-width: 1024px) {
   .control-body {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
     height: auto;
+  }
+
+  .resize-handle {
+    display: none;
   }
 
   .control-left,
@@ -1544,7 +1590,11 @@ h1, h2, h3, p { margin: 0; }
   }
 
   .control-body {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
+  }
+
+  .resize-handle {
+    display: none;
   }
 
   .camera-grid {

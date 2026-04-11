@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/src/lib/firebase";
@@ -34,6 +34,12 @@ export default function ControlPage() {
   const [rtmpUrl, setRtmpUrl] = useState("rtmp://live-api.facebook.com:80/rtmp/");
   const [streamKey, setStreamKey] = useState("");
   const [isLive, setIsLive] = useState(false);
+  const [leftWidth, setLeftWidth] = useState(280);
+  const [rightWidth, setRightWidth] = useState(320);
+  const [showRightPanel, setShowRightPanel] = useState(true);
+  const draggingRef = useRef<"left" | "right" | null>(null);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(0);
 
   const router = useRouter();
 
@@ -51,22 +57,27 @@ export default function ControlPage() {
     socket.on("control:camera", (cameraId: string) => setActiveCameraId(cameraId));
     socket.on("camera:list", (cameraList: Camera[]) => setCameras(cameraList));
     socket.on("camera:added", (camera: Camera) => {
-      setCameras((prev) => (prev.some((item) => item.id === camera.id) ? prev : [...prev, camera]));
+      setCameras((prev) => {
+        if (prev.some((item) => item.id === camera.id)) return prev;
+        return [...prev, { ...camera, status: "online" as const }];
+      });
     });
     socket.on("mobile-camera:joined", (mobileCameraData: any) => {
+      const mobileId = `mobile-${Date.now()}`;
+      const mobileName = mobileCameraData.cameraName || `Mobile Camera (${mobileCameraData.device || "Remote"})`;
       setCameras((prev) => [
         ...prev,
         {
-          id: `mobile-${Date.now()}`,
-          name: `Mobile Camera (${mobileCameraData.device || "Remote"})`,
-          protocol: "WebRTC",
+          id: mobileId,
+          name: mobileName,
+          protocol: "WebRTC" as const,
           ipAddress: "",
           streamUrl: "webrtc://mobile",
-          status: "online",
+          status: "online" as const,
           supportsPTZ: false,
           isMobile: true,
           enabled: true,
-          signalStrength: "good",
+          signalStrength: "good" as const,
         },
       ]);
     });
@@ -165,6 +176,35 @@ export default function ControlPage() {
     }
   };
 
+  const onMouseDown = useCallback((side: "left" | "right", e: React.MouseEvent) => {
+    e.preventDefault();
+    draggingRef.current = side;
+    startXRef.current = e.clientX;
+    startWidthRef.current = side === "left" ? leftWidth : rightWidth;
+
+    const onMouseMove = (ev: MouseEvent) => {
+      const delta = ev.clientX - startXRef.current;
+      if (draggingRef.current === "left") {
+        setLeftWidth(Math.max(180, Math.min(500, startWidthRef.current + delta)));
+      } else if (draggingRef.current === "right") {
+        setRightWidth(Math.max(220, Math.min(600, startWidthRef.current - delta)));
+      }
+    };
+
+    const onMouseUp = () => {
+      draggingRef.current = null;
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }, [leftWidth, rightWidth]);
+
   return (
     <div className="control-shell">
       {/* TOP STATUS BAR */}
@@ -173,14 +213,19 @@ export default function ControlPage() {
         badge={connected ? "Live Sync" : "Offline"}
         currentSong={activeSong.title}
         isLive={isLive}
+        showRightPanel={showRightPanel}
+        onToggleRightPanel={() => setShowRightPanel((s) => !s)}
       />
 
       {/* 3-PANEL BODY */}
-      <div className="control-body">
+      <div className="control-body" style={{ gridTemplateColumns: showRightPanel ? `${leftWidth}px 6px 1fr 6px ${rightWidth}px` : `${leftWidth}px 6px 1fr` }}>
         {/* LEFT: SETLIST */}
         <div className="control-left">
           <SetlistPanel songs={songs} activeSongId={activeSongId} onSelectSong={selectSong} onReorder={handleReorderSong} />
         </div>
+
+        {/* LEFT RESIZE HANDLE */}
+        <div className="resize-handle" onMouseDown={(e) => onMouseDown("left", e)} />
 
         {/* CENTER: PROGRAM/PREVIEW + LYRICS */}
         <div className="control-center">
@@ -216,7 +261,11 @@ export default function ControlPage() {
           <LyricsPreviewPanel song={activeSong} currentSlide={currentSlide} onJumpToSlide={jumpToSection} />
         </div>
 
+        {/* RIGHT RESIZE HANDLE */}
+        {showRightPanel && <div className="resize-handle" onMouseDown={(e) => onMouseDown("right", e)} />}
+
         {/* RIGHT: PRODUCTION CONTROLS */}
+        {showRightPanel && (
         <div className="control-right">
           <CameraPreviewPanel cameras={cameras} activeCameraId={previewCameraId} onSelectCamera={selectCamera} />
           <CameraTransitionPanel transition={cameraTransition} onChangeTransition={changeTransition} />
@@ -237,6 +286,7 @@ export default function ControlPage() {
           <MobileCameraInvitePanel />
           <SyncStatusBadge status={connected ? "connected" : "disconnected"} />
         </div>
+        )}
       </div>
 
       {/* BOTTOM CONTROL BAR */}
