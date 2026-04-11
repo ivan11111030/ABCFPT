@@ -19,7 +19,7 @@ export const createSocketClient = (): Socket => {
     } as unknown as Socket;
   }
 
-  socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:4000", {
+  socket = io(process.env.SOCKET_SERVER_URL || "http://localhost:4000", {
     transports: ["websocket"],
     autoConnect: true,
   });
