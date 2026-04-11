@@ -22,6 +22,7 @@ export default function MobileCameraPage() {
 function MobileCameraInner() {
   const searchParams = useSearchParams();
   const cameraName = searchParams.get("name") || "Phone Camera";
+  const cameraIdRef = useRef(`camera-phone-${Date.now()}`);
   const [status, setStatus] = useState("disconnected");
   const [streamState, setStreamState] = useState("idle");
   const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
@@ -36,6 +37,7 @@ function MobileCameraInner() {
   useEffect(() => {
     const emitJoin = () => {
       socket.emit("mobile-camera:join", {
+        cameraId: cameraIdRef.current,
         device: navigator.userAgent,
         cameraName,
         supportedResolutions: ["720p", "1080p"],
@@ -54,14 +56,24 @@ function MobileCameraInner() {
       setStatus("connected");
       emitJoin();
     }
-    socket.on("mobile-camera:answer", async (description: RTCSessionDescriptionInit) => {
-      if (pcRef.current) {
+    socket.on("mobile-camera:answer", async (payload: any) => {
+      const description: RTCSessionDescriptionInit = payload?.description ?? payload;
+      const payloadCameraId: string | undefined = payload?.cameraId;
+
+      if (payloadCameraId && payloadCameraId !== cameraIdRef.current) return;
+
+      if (pcRef.current && description?.type) {
         await pcRef.current.setRemoteDescription(new RTCSessionDescription(description));
       }
     });
 
-    socket.on("mobile-camera:candidate", async (candidate: RTCIceCandidateInit) => {
-      if (pcRef.current) {
+    socket.on("mobile-camera:candidate", async (payload: any) => {
+      const candidate: RTCIceCandidateInit = payload?.candidate ?? payload;
+      const payloadCameraId: string | undefined = payload?.cameraId;
+
+      if (payloadCameraId && payloadCameraId !== cameraIdRef.current) return;
+
+      if (pcRef.current && candidate?.candidate) {
         await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
       }
     });
@@ -89,7 +101,7 @@ function MobileCameraInner() {
         videoRef.current.srcObject = stream;
       }
       socket.emit("camera:add", {
-        id: `camera-phone-${Date.now()}`,
+        id: cameraIdRef.current,
         name: cameraName,
         protocol: "WebRTC",
         ipAddress: "",
@@ -136,13 +148,20 @@ function MobileCameraInner() {
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
-        socket.emit("mobile-camera:candidate", event.candidate);
+        socket.emit("mobile-camera:candidate", {
+          cameraId: cameraIdRef.current,
+          candidate: event.candidate,
+        });
       }
     };
 
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    socket.emit("mobile-camera:offer", offer);
+    socket.emit("mobile-camera:offer", {
+      cameraId: cameraIdRef.current,
+      cameraName,
+      description: offer,
+    });
     setStreamState("connecting");
   };
 

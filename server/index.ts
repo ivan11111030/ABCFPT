@@ -14,6 +14,8 @@ type StreamActionPayload = {
 };
 
 type MobileCameraPayload = {
+  cameraId?: string;
+  cameraName?: string;
   device: string;
   supportedResolutions: string[];
 };

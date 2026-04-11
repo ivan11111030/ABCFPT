@@ -22,6 +22,13 @@ import type { Camera, CameraTransition, SceneMode, Song } from "@/src/types/prod
 
 const socket = createSocketClient();
 
+type SignalingPayload = {
+  cameraId?: string;
+  cameraName?: string;
+  description?: RTCSessionDescriptionInit;
+  candidate?: RTCIceCandidateInit;
+};
+
 export default function ControlPage() {
   const [songs, setSongs] = useState<Song[]>(sampleSongs);
   const [activeSongId, setActiveSongId] = useState(sampleSongs[0].id);
@@ -39,9 +46,11 @@ export default function ControlPage() {
   const [rightWidth, setRightWidth] = useState(320);
   const [showRightPanel, setShowRightPanel] = useState(true);
   const [localStreams, setLocalStreams] = useState<Record<string, MediaStream>>({});
+  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   const draggingRef = useRef<"left" | "right" | null>(null);
   const startXRef = useRef(0);
   const startWidthRef = useRef(0);
+  const peerConnectionsRef = useRef<Record<string, RTCPeerConnection>>({});
   const programVideoRef = useRef<HTMLVideoElement>(null);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
 
@@ -67,10 +76,10 @@ export default function ControlPage() {
       });
     });
     socket.on("mobile-camera:joined", (mobileCameraData: any) => {
-      const mobileId = `mobile-${Date.now()}`;
+      const mobileId = mobileCameraData.cameraId || `mobile-${Date.now()}`;
       const mobileName = mobileCameraData.cameraName || `Mobile Camera (${mobileCameraData.device || "Remote"})`;
       setCameras((prev) => {
-        const alreadyExists = prev.some((c) => c.name === mobileName && c.isMobile);
+        const alreadyExists = prev.some((c) => c.id === mobileId);
         if (alreadyExists) return prev;
         return [
           ...prev,
@@ -90,6 +99,57 @@ export default function ControlPage() {
       });
     });
 
+    socket.on("mobile-camera:offer", async (payload: SignalingPayload | RTCSessionDescriptionInit) => {
+      const cameraId = (payload as SignalingPayload)?.cameraId;
+      const description = (payload as SignalingPayload)?.description ?? (payload as RTCSessionDescriptionInit);
+
+      if (!cameraId || !description?.type) return;
+
+      let pc = peerConnectionsRef.current[cameraId];
+      if (!pc) {
+        pc = new RTCPeerConnection({
+          iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }],
+        });
+
+        pc.ontrack = (event) => {
+          const [stream] = event.streams;
+          if (!stream) return;
+          setRemoteStreams((prev) => ({ ...prev, [cameraId]: stream }));
+        };
+
+        pc.onicecandidate = (event) => {
+          if (!event.candidate) return;
+          socket.emit("mobile-camera:candidate", {
+            cameraId,
+            candidate: event.candidate,
+          });
+        };
+
+        peerConnectionsRef.current[cameraId] = pc;
+      }
+
+      await pc.setRemoteDescription(new RTCSessionDescription(description));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+
+      socket.emit("mobile-camera:answer", {
+        cameraId,
+        description: answer,
+      });
+    });
+
+    socket.on("mobile-camera:candidate", async (payload: SignalingPayload | RTCIceCandidateInit) => {
+      const cameraId = (payload as SignalingPayload)?.cameraId;
+      const candidate = (payload as SignalingPayload)?.candidate ?? (payload as RTCIceCandidateInit);
+
+      if (!cameraId || !candidate?.candidate) return;
+
+      const pc = peerConnectionsRef.current[cameraId];
+      if (!pc) return;
+
+      await pc.addIceCandidate(new RTCIceCandidate(candidate));
+    });
+
     return () => {
       unsubscribeAuth();
       socket.off("connect");
@@ -100,6 +160,11 @@ export default function ControlPage() {
       socket.off("camera:list");
       socket.off("camera:added");
       socket.off("mobile-camera:joined");
+      socket.off("mobile-camera:offer");
+      socket.off("mobile-camera:candidate");
+
+      Object.values(peerConnectionsRef.current).forEach((pc) => pc.close());
+      peerConnectionsRef.current = {};
     };
   }, [router]);
 
@@ -173,21 +238,35 @@ export default function ControlPage() {
       delete next[cameraId];
       return next;
     });
+
+    setRemoteStreams((prev) => {
+      const next = { ...prev };
+      delete next[cameraId];
+      return next;
+    });
+
+    const pc = peerConnectionsRef.current[cameraId];
+    if (pc) {
+      pc.close();
+      delete peerConnectionsRef.current[cameraId];
+    }
   };
 
+  const streamByCamera = useMemo(() => ({ ...remoteStreams, ...localStreams }), [localStreams, remoteStreams]);
+
   useEffect(() => {
-    const stream = localStreams[activeCameraId];
+    const stream = streamByCamera[activeCameraId];
     if (programVideoRef.current) {
       programVideoRef.current.srcObject = stream ?? null;
     }
-  }, [activeCameraId, localStreams]);
+  }, [activeCameraId, streamByCamera]);
 
   useEffect(() => {
-    const stream = localStreams[previewCameraId];
+    const stream = streamByCamera[previewCameraId];
     if (previewVideoRef.current) {
       previewVideoRef.current.srcObject = stream ?? null;
     }
-  }, [previewCameraId, localStreams]);
+  }, [previewCameraId, streamByCamera]);
 
   useEffect(() => {
     return () => {
@@ -289,7 +368,7 @@ export default function ControlPage() {
             <div className="program-box">
               <span className="box-label">Program (Live)</span>
               <div className="box-content">
-                {activeCamera?.streamUrl?.startsWith("local://") ? (
+                {streamByCamera[activeCamera?.id] ? (
                   <video ref={programVideoRef} autoPlay muted playsInline className="program-video" />
                 ) : (
                   <div>
@@ -304,7 +383,7 @@ export default function ControlPage() {
             <div className="preview-box">
               <span className="box-label">Preview</span>
               <div className="box-content">
-                {previewCamera?.streamUrl?.startsWith("local://") ? (
+                {streamByCamera[previewCamera?.id] ? (
                   <video ref={previewVideoRef} autoPlay muted playsInline className="preview-video" />
                 ) : (
                   <div>
