@@ -2,9 +2,11 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { getIceServers } from "@/src/lib/realtimeConfig";
 import { createSocketClient } from "@/src/lib/socket";
 
 const socket = createSocketClient();
+const iceServers = getIceServers();
 
 const resolutions = [
   { value: "720p", label: "720p" },
@@ -22,17 +24,35 @@ export default function MobileCameraPage() {
 function MobileCameraInner() {
   const searchParams = useSearchParams();
   const cameraName = searchParams.get("name") || "Phone Camera";
+  const autoStart = searchParams.get("autostart") === "1";
+  const autoConnect = searchParams.get("autoconnect") === "1";
+  const initialResolution = searchParams.get("resolution");
   const cameraIdRef = useRef(`camera-phone-${Date.now()}`);
+  const pendingConnectRef = useRef(false);
   const [status, setStatus] = useState("disconnected");
   const [streamState, setStreamState] = useState("idle");
   const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
-  const [resolution, setResolution] = useState("720p");
+  const [resolution, setResolution] = useState(initialResolution === "1080p" ? "1080p" : "720p");
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [signalStrength, setSignalStrength] = useState("good");
+  const [errorMessage, setErrorMessage] = useState("");
   const videoRef = useRef<HTMLVideoElement>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  const removeCameraFromControl = () => {
+    socket.emit("camera:remove", cameraIdRef.current);
+  };
+
+  const closePeerConnection = () => {
+    if (pcRef.current) {
+      pcRef.current.onicecandidate = null;
+      pcRef.current.onconnectionstatechange = null;
+      pcRef.current.close();
+      pcRef.current = null;
+    }
+  };
 
   useEffect(() => {
     const emitJoin = () => {
@@ -47,9 +67,16 @@ function MobileCameraInner() {
     socket.on("connect", () => {
       setStatus("connected");
       emitJoin();
+
+      if (pendingConnectRef.current && streamRef.current) {
+        void connectStream(true);
+      }
     });
 
-    socket.on("disconnect", () => setStatus("disconnected"));
+    socket.on("disconnect", () => {
+      setStatus("disconnected");
+      setStreamState((current) => (current === "streaming" ? "connecting" : current));
+    });
 
     // If socket was already connected before listeners were attached, join immediately.
     if (socket.connected) {
@@ -64,6 +91,8 @@ function MobileCameraInner() {
 
       if (pcRef.current && description?.type) {
         await pcRef.current.setRemoteDescription(new RTCSessionDescription(description));
+        setStreamState("streaming");
+        setErrorMessage("");
       }
     });
 
@@ -79,6 +108,8 @@ function MobileCameraInner() {
     });
 
     return () => {
+      closePeerConnection();
+      removeCameraFromControl();
       socket.off("connect");
       socket.off("disconnect");
       socket.off("mobile-camera:answer");
@@ -86,16 +117,34 @@ function MobileCameraInner() {
     };
   }, [cameraName]);
 
-  const startLocalCamera = async (overrideFacing?: "user" | "environment") => {
-    setStreamState("starting");
-    const facing = overrideFacing ?? facingMode;
-    const constraints: MediaStreamConstraints = {
-      video: { facingMode: facing, width: resolution === "1080p" ? 1920 : 1280, height: resolution === "1080p" ? 1080 : 720 },
-      audio: audioEnabled,
+  useEffect(() => {
+    const cleanup = () => {
+      closePeerConnection();
+      removeCameraFromControl();
     };
 
+    window.addEventListener("beforeunload", cleanup);
+    return () => window.removeEventListener("beforeunload", cleanup);
+  }, []);
+
+  const startLocalCamera = async (overrideFacing?: "user" | "environment") => {
+    setStreamState("starting");
+    setErrorMessage("");
+    const facing = overrideFacing ?? facingMode;
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      closePeerConnection();
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: facing },
+          width: { ideal: resolution === "1080p" ? 1920 : 1280 },
+          height: { ideal: resolution === "1080p" ? 1080 : 720 },
+        },
+        audio: audioEnabled,
+      });
+
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -114,13 +163,21 @@ function MobileCameraInner() {
       });
       setCameraEnabled(true);
       setStreamState("ready");
+      setSignalStrength("good");
+
+      if (pendingConnectRef.current && socket.connected) {
+        await connectStream(true);
+      }
     } catch (error) {
       console.error(error);
       setStreamState("error");
+      setErrorMessage("Camera permission was denied or the selected camera mode is unavailable.");
     }
   };
 
   const stopCamera = () => {
+    pendingConnectRef.current = false;
+    closePeerConnection();
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     if (videoRef.current) {
@@ -128,10 +185,20 @@ function MobileCameraInner() {
     }
     setCameraEnabled(false);
     setStreamState("idle");
+    setErrorMessage("");
+    removeCameraFromControl();
   };
 
-  const connectStream = async () => {
+  const connectStream = async (skipEnsureCamera = false) => {
+    pendingConnectRef.current = true;
+
+    if (!socket.connected) {
+      setStreamState("connecting");
+      return;
+    }
+
     if (!streamRef.current) {
+      if (skipEnsureCamera) return;
       await startLocalCamera();
     }
 
@@ -139,10 +206,30 @@ function MobileCameraInner() {
       return;
     }
 
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }],
-    });
+    closePeerConnection();
+
+    const pc = new RTCPeerConnection({ iceServers });
     pcRef.current = pc;
+
+    pc.onconnectionstatechange = () => {
+      const state = pc.connectionState;
+      if (state === "connected") {
+        setStreamState("streaming");
+        setSignalStrength("good");
+        setErrorMessage("");
+      } else if (state === "connecting") {
+        setStreamState("connecting");
+      } else if (state === "failed") {
+        setStreamState("error");
+        setSignalStrength("weak");
+        setErrorMessage("Phone video could not reach the control app. Add TURN credentials for cross-network reliability.");
+      } else if (state === "disconnected") {
+        setStreamState("connecting");
+        setSignalStrength("fair");
+      } else if (state === "closed") {
+        setStreamState(cameraEnabled ? "ready" : "idle");
+      }
+    };
 
     streamRef.current.getTracks().forEach((track) => pc.addTrack(track, streamRef.current as MediaStream));
 
@@ -168,9 +255,23 @@ function MobileCameraInner() {
   const switchCamera = async () => {
     const nextFacing = facingMode === "environment" ? "user" : "environment";
     setFacingMode(nextFacing);
-    stopCamera();
+    const reconnectAfterSwitch = pendingConnectRef.current;
+    pendingConnectRef.current = false;
+    closePeerConnection();
     await startLocalCamera(nextFacing);
+
+    if (reconnectAfterSwitch) {
+      pendingConnectRef.current = true;
+      await connectStream();
+    }
   };
+
+  useEffect(() => {
+    if (!autoStart) return;
+
+    pendingConnectRef.current = autoConnect;
+    void startLocalCamera();
+  }, [autoStart, autoConnect]);
 
   const connectionBadge = useMemo(() => {
     if (status === "connected") return "Connected to Production";
@@ -179,6 +280,7 @@ function MobileCameraInner() {
 
   const streamStateLabel = useMemo(() => {
     if (streamState === "ready") return "🟢 Camera Ready";
+    if (streamState === "streaming") return "🔴 Live in Production";
     if (streamState === "connecting") return "🟡 Connecting...";
     if (streamState === "starting") return "🟡 Starting camera";
     if (streamState === "error") return "🔴 Camera error";
@@ -214,7 +316,7 @@ function MobileCameraInner() {
       {/* Controls */}
       <section className="mobile-controls">
         <button className="button primary" onClick={() => startLocalCamera()} disabled={cameraEnabled} style={{ padding: "16px", fontSize: "16px" }}>
-          Activate Camera
+          {autoStart ? "Camera Activated" : "Activate Camera"}
         </button>
 
         <div className="control-group">
@@ -241,11 +343,15 @@ function MobileCameraInner() {
 
         <button
           className="button broadcast"
-          onClick={connectStream}
-          disabled={!cameraEnabled || streamState === "connecting" || status !== "connected"}
+          onClick={() => void connectStream()}
+          disabled={!cameraEnabled || streamState === "connecting" || streamState === "streaming" || status !== "connected"}
         >
-          GO LIVE
+          {streamState === "streaming" ? "LIVE" : "GO LIVE"}
         </button>
+
+        {errorMessage && (
+          <p style={{ margin: 0, fontSize: 13, color: "var(--danger)" }}>{errorMessage}</p>
+        )}
 
         <button className="button danger" onClick={stopCamera} disabled={!cameraEnabled} style={{ width: "100%", padding: "14px" }}>
           Stop Camera

@@ -10,6 +10,7 @@ const corsOrigins = (process.env.CLIENT_ORIGIN || "*")
   .map((origin) => origin.trim())
   .filter(Boolean);
 const server = http.createServer(app);
+const socketCameraMap = new Map<string, string>();
 
 /* ── Types ──────────────────────────────────────────── */
 type SceneMode = "worship" | "speaker" | "announcement" | "lyrics";
@@ -163,6 +164,10 @@ io.on("connection", (socket: Socket) => {
 
   /* ── Camera events ───────────────────────────────── */
   socket.on("camera:add", (camera: Camera) => {
+    if (camera.isMobile) {
+      socketCameraMap.set(socket.id, camera.id);
+    }
+
     if (!state.cameras.some((c) => c.id === camera.id)) {
       state.cameras.push({ ...camera, status: "online" });
     } else {
@@ -174,6 +179,9 @@ io.on("connection", (socket: Socket) => {
 
   socket.on("camera:remove", (cameraId: string) => {
     state.cameras = state.cameras.filter((c) => c.id !== cameraId);
+    if (socketCameraMap.get(socket.id) === cameraId) {
+      socketCameraMap.delete(socket.id);
+    }
     io.emit("camera:list", state.cameras);
   });
 
@@ -191,6 +199,8 @@ io.on("connection", (socket: Socket) => {
       enabled: true,
       signalStrength: "good",
     };
+    socketCameraMap.set(socket.id, cam.id);
+
     if (!state.cameras.some((c) => c.id === cam.id)) {
       state.cameras.push(cam);
     } else {
@@ -272,6 +282,14 @@ io.on("connection", (socket: Socket) => {
   });
 
   socket.on("disconnect", () => {
+    const mobileCameraId = socketCameraMap.get(socket.id);
+
+    if (mobileCameraId) {
+      state.cameras = state.cameras.filter((camera) => camera.id !== mobileCameraId);
+      socketCameraMap.delete(socket.id);
+      io.emit("camera:list", state.cameras);
+    }
+
     console.log(`Socket disconnected: ${socket.id}`);
   });
 });

@@ -18,12 +18,14 @@ import { LivestreamStudioPanel } from "@/src/components/LivestreamStudioPanel";
 import { LocalCameraPanel } from "@/src/components/LocalCameraPanel";
 import { SongManagementPanel } from "@/src/components/SongManagementPanel";
 import { DraggableOverlay, LAYOUT_PRESETS, type OverlayLayout, type OverlayPosition } from "@/src/components/DraggableOverlay";
+import { getIceServers } from "@/src/lib/realtimeConfig";
 import { createSocketClient } from "@/src/lib/socket";
 import { sampleCameras, sampleSongs } from "@/src/lib/fakeData";
 import { parseFile } from "@/src/lib/songParser";
 import type { Camera, CameraTransition, SceneMode, Song } from "@/src/types/production";
 
 const socket = createSocketClient();
+const iceServers = getIceServers();
 
 type SignalingPayload = {
   cameraId?: string;
@@ -140,9 +142,7 @@ export default function ControlPage() {
 
       let pc = peerConnectionsRef.current[cameraId];
       if (!pc) {
-        pc = new RTCPeerConnection({
-          iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }],
-        });
+        pc = new RTCPeerConnection({ iceServers });
 
         pc.ontrack = (event) => {
           const [stream] = event.streams;

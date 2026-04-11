@@ -1,4 +1,5 @@
 import { io, Socket } from "socket.io-client";
+import { getSocketServerUrl } from "@/src/lib/realtimeConfig";
 
 let socket: Socket | null = null;
 
@@ -19,9 +20,13 @@ export const createSocketClient = (): Socket => {
     } as unknown as Socket;
   }
 
-  socket = io(process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || "http://localhost:4000", {
+  socket = io(getSocketServerUrl(), {
     transports: ["websocket"],
     autoConnect: true,
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
   });
 
   return socket;
