@@ -57,6 +57,7 @@ export default function ControlPage() {
   const [showRightPanel, setShowRightPanel] = useState(true);
   const [localStreams, setLocalStreams] = useState<Record<string, MediaStream>>({});
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
+  const [snapshotFrames, setSnapshotFrames] = useState<Record<string, string>>({});
   const [overlayEnabled, setOverlayEnabled] = useState(true);
   const [overlayLayout, setOverlayLayout] = useState<OverlayLayout>("lower-third");
   const [overlayPos, setOverlayPos] = useState<OverlayPosition>(LAYOUT_PRESETS["lower-third"]);
@@ -183,6 +184,13 @@ export default function ControlPage() {
       await pc.addIceCandidate(new RTCIceCandidate(candidate));
     });
 
+    // Snapshot fallback: receive frames relayed through the socket server
+    socket.on("mobile-camera:snapshot", (payload: { cameraId: string; frame: string }) => {
+      if (payload?.cameraId && payload?.frame) {
+        setSnapshotFrames((prev) => ({ ...prev, [payload.cameraId]: payload.frame }));
+      }
+    });
+
     return () => {
       unsubscribeAuth();
       socket.off("connect");
@@ -204,6 +212,7 @@ export default function ControlPage() {
       socket.off("mobile-camera:joined");
       socket.off("mobile-camera:offer");
       socket.off("mobile-camera:candidate");
+      socket.off("mobile-camera:snapshot");
       // NOTE: Do NOT close peer connections on unmount to preserve camera connections
     };
   }, [router]);
@@ -514,6 +523,19 @@ export default function ControlPage() {
                       </DraggableOverlay>
                     )}
                   </>
+                ) : snapshotFrames[activeCamera?.id] ? (
+                  <>
+                    <img src={snapshotFrames[activeCamera.id]} alt={activeCamera.name} className="program-video" style={{ objectFit: "cover" }} />
+                    <span style={{ position: "absolute", top: 6, right: 8, fontSize: 10, background: "rgba(0,0,0,0.6)", padding: "2px 6px", borderRadius: 4, color: "#f59e0b" }}>RELAY</span>
+                    {overlayEnabled && (
+                      <DraggableOverlay position={overlayPos} onPositionChange={handleOverlayDrag}>
+                        <div className="overlay-lyrics">
+                          <p>{activeSong.slides[currentSlide]?.text}</p>
+                          <span className="overlay-section">{activeSong.slides[currentSlide]?.section} • {activeCamera.name}</span>
+                        </div>
+                      </DraggableOverlay>
+                    )}
+                  </>
                 ) : (
                   <div>
                     <p>{activeSong.slides[currentSlide]?.text}</p>
@@ -538,6 +560,11 @@ export default function ControlPage() {
                         </div>
                       </DraggableOverlay>
                     )}
+                  </>
+                ) : snapshotFrames[previewCamera?.id] ? (
+                  <>
+                    <img src={snapshotFrames[previewCamera.id]} alt={previewCamera.name} className="preview-video" style={{ objectFit: "cover" }} />
+                    <span style={{ position: "absolute", top: 6, right: 8, fontSize: 10, background: "rgba(0,0,0,0.6)", padding: "2px 6px", borderRadius: 4, color: "#f59e0b" }}>RELAY</span>
                   </>
                 ) : (
                   <div>

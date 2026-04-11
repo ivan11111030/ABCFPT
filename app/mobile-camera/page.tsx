@@ -38,8 +38,12 @@ function MobileCameraInner() {
   const [signalStrength, setSignalStrength] = useState("good");
   const [errorMessage, setErrorMessage] = useState("");
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const snapshotIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const webrtcTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [streamMode, setStreamMode] = useState<"webrtc" | "snapshot" | "none">("none");
 
   const removeCameraFromControl = () => {
     socket.emit("camera:remove", cameraIdRef.current);
@@ -52,6 +56,41 @@ function MobileCameraInner() {
       pcRef.current.close();
       pcRef.current = null;
     }
+  };
+
+  const stopSnapshotMode = () => {
+    if (snapshotIntervalRef.current) {
+      clearInterval(snapshotIntervalRef.current);
+      snapshotIntervalRef.current = null;
+    }
+  };
+
+  const startSnapshotMode = () => {
+    stopSnapshotMode();
+    setStreamMode("snapshot");
+    setStreamState("streaming");
+    setSignalStrength("fair");
+    setErrorMessage("");
+
+    const fps = 8; // 8 fps through socket — decent for a camera feed
+    snapshotIntervalRef.current = setInterval(() => {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      if (!video || !canvas || video.readyState < 2) return;
+
+      canvas.width = 640;
+      canvas.height = 360;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      ctx.drawImage(video, 0, 0, 640, 360);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.6);
+
+      socket.emit("mobile-camera:snapshot", {
+        cameraId: cameraIdRef.current,
+        frame: dataUrl,
+      });
+    }, 1000 / fps);
   };
 
   useEffect(() => {
@@ -109,6 +148,7 @@ function MobileCameraInner() {
 
     return () => {
       closePeerConnection();
+      stopSnapshotMode();
       removeCameraFromControl();
       socket.off("connect");
       socket.off("disconnect");
@@ -120,6 +160,7 @@ function MobileCameraInner() {
   useEffect(() => {
     const cleanup = () => {
       closePeerConnection();
+      stopSnapshotMode();
       removeCameraFromControl();
     };
 
@@ -177,6 +218,8 @@ function MobileCameraInner() {
 
   const stopCamera = () => {
     pendingConnectRef.current = false;
+    if (webrtcTimeoutRef.current) { clearTimeout(webrtcTimeoutRef.current); webrtcTimeoutRef.current = null; }
+    stopSnapshotMode();
     closePeerConnection();
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
@@ -185,6 +228,7 @@ function MobileCameraInner() {
     }
     setCameraEnabled(false);
     setStreamState("idle");
+    setStreamMode("none");
     setErrorMessage("");
     removeCameraFromControl();
   };
@@ -214,15 +258,18 @@ function MobileCameraInner() {
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
       if (state === "connected") {
+        if (webrtcTimeoutRef.current) { clearTimeout(webrtcTimeoutRef.current); webrtcTimeoutRef.current = null; }
+        stopSnapshotMode();
+        setStreamMode("webrtc");
         setStreamState("streaming");
         setSignalStrength("good");
         setErrorMessage("");
       } else if (state === "connecting") {
         setStreamState("connecting");
       } else if (state === "failed") {
-        setStreamState("error");
-        setSignalStrength("weak");
-        setErrorMessage("Phone video could not reach the control app. Add TURN credentials for cross-network reliability.");
+        // WebRTC failed — auto-fallback to snapshot mode
+        closePeerConnection();
+        startSnapshotMode();
       } else if (state === "disconnected") {
         setStreamState("connecting");
         setSignalStrength("fair");
@@ -250,6 +297,15 @@ function MobileCameraInner() {
       description: offer,
     });
     setStreamState("connecting");
+
+    // Auto-fallback: if WebRTC doesn't connect in 8 seconds, use snapshot mode
+    if (webrtcTimeoutRef.current) clearTimeout(webrtcTimeoutRef.current);
+    webrtcTimeoutRef.current = setTimeout(() => {
+      if (pcRef.current && pcRef.current.connectionState !== "connected") {
+        closePeerConnection();
+        startSnapshotMode();
+      }
+    }, 8000);
   };
 
   const switchCamera = async () => {
@@ -280,12 +336,13 @@ function MobileCameraInner() {
 
   const streamStateLabel = useMemo(() => {
     if (streamState === "ready") return "🟢 Camera Ready";
+    if (streamState === "streaming" && streamMode === "snapshot") return "🟠 Live (Relay Mode)";
     if (streamState === "streaming") return "🔴 Live in Production";
     if (streamState === "connecting") return "🟡 Connecting...";
     if (streamState === "starting") return "🟡 Starting camera";
     if (streamState === "error") return "🔴 Camera error";
     return "Camera inactive";
-  }, [streamState]);
+  }, [streamState, streamMode]);
 
   const signalLabel = useMemo(() => {
     if (signalStrength === "good") return "Signal: Strong";
@@ -307,6 +364,7 @@ function MobileCameraInner() {
       {/* Video Preview (full width, dominant) */}
       <section className="mobile-preview-card">
         <video ref={videoRef} autoPlay muted playsInline className="mobile-video-preview" />
+        <canvas ref={canvasRef} style={{ display: "none" }} />
         <div className="mobile-preview-overlay">
           <span>{streamStateLabel}</span>
           <span className={`signal signal-${signalStrength}`}>● {signalLabel}</span>

@@ -227,6 +227,11 @@ io.on("connection", (socket: Socket) => {
     socket.broadcast.emit("mobile-camera:status", status);
   });
 
+  // Snapshot fallback: relay camera frames through the socket server
+  socket.on("mobile-camera:snapshot", (payload: { cameraId: string; frame: string }) => {
+    socket.broadcast.emit("mobile-camera:snapshot", payload);
+  });
+
   /* ── Stream events ───────────────────────────────── */
   socket.on("stream:start", (payload: { rtmpUrl?: string; streamKey?: string; scene?: string; cameraId?: string }) => {
     if (!payload.rtmpUrl || !payload.streamKey) {
