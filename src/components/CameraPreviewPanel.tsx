@@ -10,8 +10,8 @@ export function CameraPreviewPanel({ cameras, activeCameraId, onSelectCamera }: 
   return (
     <section className="camera-panel">
       <div className="panel-header">
-        <p>Camera Preview</p>
-        <p>{cameras.length} cameras found</p>
+        <p>Cameras</p>
+        <span className="muted" style={{ fontSize: 12, color: "var(--muted)" }}>{cameras.length} sources</span>
       </div>
       <div className="camera-grid">
         {cameras.map((camera) => (
@@ -22,18 +22,14 @@ export function CameraPreviewPanel({ cameras, activeCameraId, onSelectCamera }: 
             onClick={() => onSelectCamera(camera.id)}
           >
             <div className="camera-thumbnail" aria-hidden="true">
-              <span>{camera.protocol}</span>
+              <span>{camera.isMobile ? "📱" : camera.supportsPTZ ? "🎥" : "📷"}</span>
             </div>
             <div className="camera-meta">
               <strong>{camera.name}</strong>
-              <small>{camera.streamUrl}</small>
               <div className="camera-footer">
                 <span className={camera.status === "online" ? "status online" : camera.status === "offline" ? "status offline" : "status unknown"}>
-                  {camera.status}
+                  {camera.status === "online" ? "🟢" : camera.status === "offline" ? "🔴" : "🟡"} {camera.status}
                 </span>
-                {camera.isMobile && <span className="status mobile">Mobile</span>}
-                {camera.signalStrength && <span className={`status signal ${camera.signalStrength}`}>{camera.signalStrength}</span>}
-                {camera.supportsPTZ && <span className="status ptz">PTZ</span>}
               </div>
             </div>
           </button>

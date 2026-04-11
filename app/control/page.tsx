@@ -8,7 +8,6 @@ import { TopBar } from "@/src/components/TopBar";
 import { SetlistPanel } from "@/src/components/SetlistPanel";
 import { LyricsPreviewPanel } from "@/src/components/LyricsPreviewPanel";
 import { SceneControlPanel } from "@/src/components/SceneControlPanel";
-import { SlideControls } from "@/src/components/SlideControls";
 import { AudioMonitorPanel } from "@/src/components/AudioMonitorPanel";
 import { SyncStatusBadge } from "@/src/components/SyncStatusBadge";
 import { CameraPreviewPanel } from "@/src/components/CameraPreviewPanel";
@@ -27,10 +26,10 @@ export default function ControlPage() {
   const [activeSongId, setActiveSongId] = useState(sampleSongs[0].id);
   const [activeScene, setActiveScene] = useState<SceneMode>("worship");
   const [activeCameraId, setActiveCameraId] = useState<string>(sampleCameras[0].id);
+  const [previewCameraId, setPreviewCameraId] = useState<string>(sampleCameras[1]?.id ?? sampleCameras[0].id);
   const [cameraTransition, setCameraTransition] = useState<CameraTransition>("cut");
   const [cameras, setCameras] = useState<Camera[]>(sampleCameras);
   const [connected, setConnected] = useState(false);
-  const [featureNavVisible, setFeatureNavVisible] = useState(true);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [rtmpUrl, setRtmpUrl] = useState("rtmp://live-api.facebook.com:80/rtmp/");
   const [streamKey, setStreamKey] = useState("");
@@ -59,7 +58,7 @@ export default function ControlPage() {
         ...prev,
         {
           id: `mobile-${Date.now()}`,
-          name: `Mobile Camera (${mobileCameraData.device || "Remote"})`, 
+          name: `Mobile Camera (${mobileCameraData.device || "Remote"})`,
           protocol: "WebRTC",
           ipAddress: "",
           streamUrl: "webrtc://mobile",
@@ -86,15 +85,29 @@ export default function ControlPage() {
   }, [router]);
 
   const activeSong = useMemo(() => songs.find((song) => song.id === activeSongId) ?? songs[0], [activeSongId, songs]);
+  const activeCamera = useMemo(() => cameras.find((c) => c.id === activeCameraId) ?? cameras[0], [activeCameraId, cameras]);
+  const previewCamera = useMemo(() => cameras.find((c) => c.id === previewCameraId) ?? cameras[1] ?? cameras[0], [previewCameraId, cameras]);
 
   const triggerScene = (scene: SceneMode) => {
     setActiveScene(scene);
     socket.emit("control:scene", { scene, cameraId: activeCameraId, transition: cameraTransition });
   };
 
+  const selectSong = (songId: string) => {
+    if (songId === activeSongId) return;
+    setActiveSongId(songId);
+    setCurrentSlide(0);
+    socket.emit("control:song", songId);
+    socket.emit("control:slide", 0);
+  };
+
   const selectCamera = (cameraId: string) => {
-    setActiveCameraId(cameraId);
-    socket.emit("control:camera", cameraId);
+    setPreviewCameraId(cameraId);
+  };
+
+  const handleTake = () => {
+    setActiveCameraId(previewCameraId);
+    socket.emit("control:camera", previewCameraId);
   };
 
   const changeTransition = (transition: CameraTransition) => {
@@ -105,11 +118,7 @@ export default function ControlPage() {
   const handleReorderSong = (sourceSongId: string, targetSongId: string) => {
     const sourceIndex = songs.findIndex((song) => song.id === sourceSongId);
     const targetIndex = songs.findIndex((song) => song.id === targetSongId);
-
-    if (sourceIndex === -1 || targetIndex === -1 || sourceIndex === targetIndex) {
-      return;
-    }
-
+    if (sourceIndex === -1 || targetIndex === -1 || sourceIndex === targetIndex) return;
     const nextSongs = [...songs];
     const [movedSong] = nextSongs.splice(sourceIndex, 1);
     nextSongs.splice(targetIndex, 0, movedSong);
@@ -145,55 +154,105 @@ export default function ControlPage() {
     socket.emit("control:slide", index);
   };
 
+  const handleNextSong = () => {
+    const currentIndex = songs.findIndex((s) => s.id === activeSongId);
+    if (currentIndex < songs.length - 1) {
+      const nextSongId = songs[currentIndex + 1].id;
+      setActiveSongId(nextSongId);
+      setCurrentSlide(0);
+      socket.emit("control:song", nextSongId);
+      socket.emit("control:slide", 0);
+    }
+  };
+
   return (
     <div className="control-shell">
-      <TopBar title="Production Control" badge={connected ? "Live Sync" : "Offline"} />
-      <div className="control-layout">
-        <aside className={`feature-nav ${featureNavVisible ? "open" : "collapsed"}`}>
-          <div className="panel-header">
-            <p>Core Navigation</p>
-            <button type="button" className="button subtle" onClick={() => setFeatureNavVisible((current) => !current)}>
-              {featureNavVisible ? "Hide" : "Show"}
+      {/* TOP STATUS BAR */}
+      <TopBar
+        title="ABCF Production"
+        badge={connected ? "Live Sync" : "Offline"}
+        currentSong={activeSong.title}
+        isLive={isLive}
+      />
+
+      {/* 3-PANEL BODY */}
+      <div className="control-body">
+        {/* LEFT: SETLIST */}
+        <div className="control-left">
+          <SetlistPanel songs={songs} activeSongId={activeSongId} onSelectSong={selectSong} onReorder={handleReorderSong} />
+        </div>
+
+        {/* CENTER: PROGRAM/PREVIEW + LYRICS */}
+        <div className="control-center">
+          <div className="program-preview-stack">
+            {/* PROGRAM (LIVE) */}
+            <div className="program-box">
+              <span className="box-label">Program (Live)</span>
+              <div className="box-content">
+                <div>
+                  <p>{activeSong.slides[currentSlide]?.text}</p>
+                  <p className="camera-name">{activeCamera.name}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* PREVIEW (Next) */}
+            <div className="preview-box">
+              <span className="box-label">Preview</span>
+              <div className="box-content">
+                <div>
+                  <p>{activeSong.slides[currentSlide + 1]?.text ?? "End of song"}</p>
+                  <p className="camera-name">{previewCamera.name}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* TAKE button */}
+            <button type="button" className="button take" onClick={handleTake}>
+              TAKE
             </button>
           </div>
-          {featureNavVisible ? (
-            <div className="feature-nav-list">
-              <button type="button" className="nav-item">Setlist</button>
-              <button type="button" className="nav-item">Lyrics Preview</button>
-              <button type="button" className="nav-item">Livestream Studio</button>
-              <button type="button" className="nav-item">Camera Preview</button>
-              <button type="button" className="nav-item">Mobile Camera</button>
-              <button type="button" className="nav-item">Projector Output</button>
-            </div>
-          ) : null}
-        </aside>
-        <div className="control-grid">
-          <SetlistPanel songs={songs} activeSongId={activeSongId} onSelectSong={setActiveSongId} onReorder={handleReorderSong} />
-          <div className="control-main">
-            <LyricsPreviewPanel song={activeSong} currentSlide={currentSlide} />
-            <SlideControls onPrevious={() => triggerSlide("previous")} onNext={() => triggerSlide("next")} onJump={jumpToSection} />
-          </div>
-          <div className="control-sidebar">
-            <LivestreamStudioPanel
-              activeScene={activeScene}
-              activeCamera={cameras.find((camera) => camera.id === activeCameraId) ?? cameras[0]}
-              transition={cameraTransition}
-              isLive={isLive}
-              onStart={startStream}
-              onStop={stopStream}
-              onToggleOverlay={toggleOverlay}
-              onChangeRtmpUrl={setRtmpUrl}
-              onChangeStreamKey={setStreamKey}
-            />
-            <CameraPreviewPanel cameras={cameras} activeCameraId={activeCameraId} onSelectCamera={selectCamera} />
-            <CameraTransitionPanel transition={cameraTransition} onChangeTransition={changeTransition} />
-            <SceneControlPanel activeScene={activeScene} onSceneChange={triggerScene} />
-            <AudioMonitorPanel />
-            <CameraDiscoveryPanel onAddCamera={handleAddCamera} />
-            <MobileCameraInvitePanel />
-            <SyncStatusBadge status={connected ? "connected" : "disconnected"} />
-          </div>
+
+          <LyricsPreviewPanel song={activeSong} currentSlide={currentSlide} onJumpToSlide={jumpToSection} />
         </div>
+
+        {/* RIGHT: PRODUCTION CONTROLS */}
+        <div className="control-right">
+          <CameraPreviewPanel cameras={cameras} activeCameraId={previewCameraId} onSelectCamera={selectCamera} />
+          <CameraTransitionPanel transition={cameraTransition} onChangeTransition={changeTransition} />
+          <SceneControlPanel activeScene={activeScene} onSceneChange={triggerScene} />
+          <LivestreamStudioPanel
+            activeScene={activeScene}
+            activeCamera={activeCamera}
+            transition={cameraTransition}
+            isLive={isLive}
+            onStart={startStream}
+            onStop={stopStream}
+            onToggleOverlay={toggleOverlay}
+            onChangeRtmpUrl={setRtmpUrl}
+            onChangeStreamKey={setStreamKey}
+          />
+          <AudioMonitorPanel />
+          <CameraDiscoveryPanel onAddCamera={handleAddCamera} />
+          <MobileCameraInvitePanel />
+          <SyncStatusBadge status={connected ? "connected" : "disconnected"} />
+        </div>
+      </div>
+
+      {/* BOTTOM CONTROL BAR */}
+      <div className="control-bar">
+        <button type="button" className="button outline" onClick={() => triggerSlide("previous")}>
+          Prev Slide
+        </button>
+        <button type="button" className="button primary" onClick={() => triggerSlide("next")}>
+          Next Slide
+        </button>
+        <button type="button" className="button success" onClick={handleNextSong}>
+          Next Song
+        </button>
+        <button type="button" className="button subtle" onClick={() => triggerScene(activeScene)}>
+          Scene: {activeScene}
+        </button>
       </div>
     </div>
   );

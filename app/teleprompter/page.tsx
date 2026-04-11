@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { createSocketClient } from "@/src/lib/socket";
 import { sampleSongs } from "@/src/lib/fakeData";
 import type { Song } from "@/src/types/production";
@@ -17,7 +17,10 @@ export default function TeleprompterPage() {
     socket.on("control:slide", setSlideIndex);
     socket.on("control:song", (songId: string) => {
       const nextSong = sampleSongs.find((item) => item.id === songId);
-      if (nextSong) setSong(nextSong);
+      if (nextSong) {
+        setSong(nextSong);
+        setSlideIndex(0);
+      }
     });
 
     return () => {
@@ -33,31 +36,38 @@ export default function TeleprompterPage() {
     <main className={darkMode ? "teleprompter-shell dark" : "teleprompter-shell"}>
       <header className="teleprompter-header">
         <div>
-          <p className="track-label">Singer Teleprompter</p>
-          <h1>{song.title}</h1>
-          <p>{song.currentSection}</p>
+          <p className="track-label">Teleprompter</p>
+          <h1 style={{ fontSize: 22 }}>{song.title}</h1>
+          <p style={{ color: "var(--muted)", fontSize: 14 }}>{currentSlide.section}</p>
         </div>
         <div className="teleprompter-controls">
-          <button onClick={() => setDarkMode((state) => !state)} className="button subtle">
-            {darkMode ? "Light" : "Dark"}
+          <button onClick={() => setDarkMode((s) => !s)} className="button subtle">
+            {darkMode ? "☀️ Light" : "🌙 Dark"}
           </button>
           <input
             type="range"
             min="28"
             max="70"
             value={fontSize}
-            onChange={(event) => setFontSize(Number(event.target.value))}
+            onChange={(e) => setFontSize(Number(e.target.value))}
+            title="Font size"
           />
         </div>
       </header>
 
       <section className="teleprompter-stage" style={{ fontSize }}>
-        <p className="teleprompter-current">{currentSlide.text}</p>
-        {nextLine && <p className="teleprompter-next">Next: {nextLine}</p>}
+        <div>
+          <p className="teleprompter-current">{currentSlide.text}</p>
+          {nextLine && (
+            <p className="teleprompter-next">
+              Next: {nextLine}
+            </p>
+          )}
+        </div>
       </section>
 
       <footer className="teleprompter-footer">
-        <p>Connected via realtime sync</p>
+        <p>Connected via realtime sync • Slide {slideIndex + 1} of {song.slides.length}</p>
       </footer>
     </main>
   );

@@ -52,10 +52,11 @@ export default function MobileCameraPage() {
     };
   }, []);
 
-  const startLocalCamera = async () => {
+  const startLocalCamera = async (overrideFacing?: "user" | "environment") => {
     setStreamState("starting");
+    const facing = overrideFacing ?? facingMode;
     const constraints: MediaStreamConstraints = {
-      video: { facingMode, width: resolution === "1080p" ? 1920 : 1280, height: resolution === "1080p" ? 1080 : 720 },
+      video: { facingMode: facing, width: resolution === "1080p" ? 1920 : 1280, height: resolution === "1080p" ? 1080 : 720 },
       audio: audioEnabled,
     };
 
@@ -124,71 +125,78 @@ export default function MobileCameraPage() {
   };
 
   const switchCamera = async () => {
-    setFacingMode((current) => (current === "environment" ? "user" : "environment"));
+    const nextFacing = facingMode === "environment" ? "user" : "environment";
+    setFacingMode(nextFacing);
     stopCamera();
-    await startLocalCamera();
+    await startLocalCamera(nextFacing);
   };
 
   const connectionBadge = useMemo(() => {
-    if (status === "connected") return "Connected to server";
-    if (status === "disconnected") return "Waiting for connection";
-    return "Unknown";
+    if (status === "connected") return "Connected to Production";
+    return "Waiting for connection";
   }, [status]);
 
   const streamStateLabel = useMemo(() => {
-    if (streamState === "ready") return "Camera ready";
-    if (streamState === "connecting") return "Connecting...";
-    if (streamState === "starting") return "Starting camera";
-    if (streamState === "error") return "Camera error";
+    if (streamState === "ready") return "🟢 Camera Ready";
+    if (streamState === "connecting") return "🟡 Connecting...";
+    if (streamState === "starting") return "🟡 Starting camera";
+    if (streamState === "error") return "🔴 Camera error";
     return "Camera inactive";
   }, [streamState]);
 
+  const signalLabel = useMemo(() => {
+    if (signalStrength === "good") return "Signal: Strong";
+    if (signalStrength === "fair") return "Signal: Fair";
+    return "Signal: Weak";
+  }, [signalStrength]);
+
   return (
     <main className="mobile-camera-shell">
-      <header className="panel-header preview-header">
-        <div>
-          <p className="eyebrow">Mobile Camera</p>
-          <h1>Use this phone as a wireless livestream camera.</h1>
-        </div>
-        <div className="badge-row">
-          <span className={`status-pill ${status === "connected" ? "active" : "offline"}`}>{connectionBadge}</span>
-        </div>
-      </header>
+      {/* Header */}
+      <div className="mobile-camera-header">
+        <h1>Mobile Camera</h1>
+        <p>{connectionBadge}</p>
+        <span className={`status-pill ${status === "connected" ? "active" : "offline"}`}>
+          {status === "connected" ? "🟢" : "🔴"} {status}
+        </span>
+      </div>
 
+      {/* Video Preview (full width, dominant) */}
       <section className="mobile-preview-card">
         <video ref={videoRef} autoPlay muted playsInline className="mobile-video-preview" />
         <div className="mobile-preview-overlay">
           <span>{streamStateLabel}</span>
-          <span className={`signal signal-${signalStrength}`}>● {signalStrength}</span>
+          <span className={`signal signal-${signalStrength}`}>● {signalLabel}</span>
         </div>
       </section>
 
+      {/* Controls */}
       <section className="mobile-controls">
-        <button className="button primary" onClick={startLocalCamera} disabled={cameraEnabled}>
+        <button className="button primary" onClick={() => startLocalCamera()} disabled={cameraEnabled} style={{ padding: "16px", fontSize: "16px" }}>
           Activate Camera
         </button>
 
         <div className="control-group">
-          <button className="button subtle" onClick={switchCamera} disabled={!cameraEnabled}>
+          <button className="button outline" onClick={switchCamera} disabled={!cameraEnabled} style={{ flex: 1 }}>
             Switch Camera
           </button>
-
-          <label>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--muted)" }}>
             Audio
-            <input type="checkbox" checked={audioEnabled} onChange={() => setAudioEnabled((current) => !current)} />
+            <input type="checkbox" checked={audioEnabled} onChange={() => setAudioEnabled((c) => !c)} />
           </label>
         </div>
 
-        <label>
-          Resolution
-          <select value={resolution} onChange={(event) => setResolution(event.target.value)}>
-            {resolutions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
+        <div className="mobile-meta-row">
+          <span>Resolution: {resolution}</span>
+          <select value={resolution} onChange={(e) => setResolution(e.target.value)} style={{
+            padding: "8px 12px", borderRadius: 10, border: "1px solid var(--border)",
+            background: "var(--card)", color: "var(--text)", fontSize: 14
+          }}>
+            {resolutions.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
-        </label>
+        </div>
 
         <button
           className="button broadcast"
@@ -198,7 +206,7 @@ export default function MobileCameraPage() {
           GO LIVE
         </button>
 
-        <button className="button outline" onClick={stopCamera} disabled={!cameraEnabled}>
+        <button className="button danger" onClick={stopCamera} disabled={!cameraEnabled} style={{ width: "100%", padding: "14px" }}>
           Stop Camera
         </button>
       </section>

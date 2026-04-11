@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type DragEvent } from "react";
+import { useMemo, useState, type DragEvent } from "react";
 import type { Song } from "@/src/types/production";
 
 type SetlistPanelProps = {
@@ -12,6 +12,15 @@ type SetlistPanelProps = {
 
 export function SetlistPanel({ songs, activeSongId, onSelectSong, onReorder }: SetlistPanelProps) {
   const [draggedSongId, setDraggedSongId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+
+  const filteredSongs = useMemo(() => {
+    if (!search.trim()) return songs;
+    const q = search.toLowerCase();
+    return songs.filter(
+      (song) => song.title.toLowerCase().includes(q) || song.artist.toLowerCase().includes(q)
+    );
+  }, [songs, search]);
 
   const handleDragStart = (event: DragEvent<HTMLButtonElement>, songId: string) => {
     setDraggedSongId(songId);
@@ -33,12 +42,19 @@ export function SetlistPanel({ songs, activeSongId, onSelectSong, onReorder }: S
   };
 
   return (
-    <aside className="setlist-panel">
+    <div className="setlist-panel">
       <div className="panel-header">
         <p>Setlist</p>
       </div>
+      <input
+        type="search"
+        className="setlist-search"
+        placeholder="Search songs..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
       <div className="setlist-items">
-        {songs.map((song) => (
+        {filteredSongs.map((song, index) => (
           <button
             key={song.id}
             type="button"
@@ -49,11 +65,14 @@ export function SetlistPanel({ songs, activeSongId, onSelectSong, onReorder }: S
             onDragOver={handleDragOver}
             onDrop={(event) => handleDrop(event, song.id)}
           >
-            <span>{song.title}</span>
-            <small>{song.artist}</small>
+            <span className="setlist-number">{index + 1}</span>
+            <div className="setlist-item-info">
+              <span>{song.title}</span>
+              <small>{song.artist}</small>
+            </div>
           </button>
         ))}
       </div>
-    </aside>
+    </div>
   );
 }

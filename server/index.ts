@@ -48,75 +48,75 @@ io.on("connection", (socket: Socket) => {
   socket.emit("camera:list", sampleCameras);
 
   socket.on("control:scene", (scene: { scene: string; cameraId: string; transition: string }) => {
-    io.emit("control:scene", scene);
+    socket.broadcast.emit("control:scene", scene);
   });
 
   socket.on("control:slide", (slideIndex: number) => {
-    io.emit("control:slide", slideIndex);
+    socket.broadcast.emit("control:slide", slideIndex);
   });
 
   socket.on("control:song", (songId: string) => {
-    io.emit("control:song", songId);
+    socket.broadcast.emit("control:song", songId);
   });
 
   socket.on("control:camera", (cameraId: string) => {
-    io.emit("control:camera", cameraId);
+    socket.broadcast.emit("control:camera", cameraId);
   });
 
   socket.on("control:camera:transition", (transition: string) => {
-    io.emit("control:camera:transition", transition);
+    socket.broadcast.emit("control:camera:transition", transition);
   });
 
   socket.on("mobile-camera:join", (mobileCameraData: MobileCameraPayload) => {
-    io.emit("mobile-camera:joined", mobileCameraData);
+    socket.broadcast.emit("mobile-camera:joined", mobileCameraData);
   });
 
   socket.on("mobile-camera:offer", (offer: RTCSessionDescriptionInit) => {
-    io.emit("mobile-camera:offer", offer);
+    socket.broadcast.emit("mobile-camera:offer", offer);
   });
 
   socket.on("mobile-camera:answer", (answer: RTCSessionDescriptionInit) => {
-    io.emit("mobile-camera:answer", answer);
+    socket.broadcast.emit("mobile-camera:answer", answer);
   });
 
   socket.on("mobile-camera:candidate", (candidate: RTCIceCandidateInit) => {
-    io.emit("mobile-camera:candidate", candidate);
+    socket.broadcast.emit("mobile-camera:candidate", candidate);
   });
 
   socket.on("mobile-camera:status", (status: { enabled: boolean; signalStrength: string }) => {
-    io.emit("mobile-camera:status", status);
+    socket.broadcast.emit("mobile-camera:status", status);
   });
 
   socket.on("stream:start", (payload: StreamActionPayload) => {
-    io.emit("stream:started", payload);
+    socket.broadcast.emit("stream:started", payload);
   });
 
   socket.on("stream:stop", (payload: StreamActionPayload) => {
-    io.emit("stream:stopped", payload);
+    socket.broadcast.emit("stream:stopped", payload);
   });
 
   socket.on("stream:toggleOverlay", (payload: { enabled: boolean }) => {
-    io.emit("stream:overlayToggled", payload);
+    socket.broadcast.emit("stream:overlayToggled", payload);
   });
 
   socket.on("camera:add", (camera: Record<string, unknown>) => {
-    io.emit("camera:added", camera);
+    socket.broadcast.emit("camera:added", camera);
   });
 
   socket.on("song:import", (songPayload: Record<string, unknown>) => {
-    io.emit("song:imported", songPayload);
+    socket.broadcast.emit("song:imported", songPayload);
   });
 
   socket.on("camera:discover", (discoveryPayload: Record<string, unknown>) => {
-    io.emit("camera:discover", discoveryPayload);
+    socket.broadcast.emit("camera:discover", discoveryPayload);
   });
 
   socket.on("teleprompter:request", (payload: Record<string, unknown>) => {
-    io.emit("teleprompter:update", payload);
+    socket.broadcast.emit("teleprompter:update", payload);
   });
 
   socket.on("audio:status", (audioStatus: AudioStatusPayload) => {
-    io.emit("audio:status", audioStatus);
+    socket.broadcast.emit("audio:status", audioStatus);
   });
 
   socket.on("disconnect", () => {
