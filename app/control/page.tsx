@@ -47,6 +47,7 @@ export default function ControlPage() {
   const [standby, setStandby] = useState(false);
   const [background, setBackground] = useState<{ type: "color" | "image"; value: string }>({ type: "color", value: "#000000" });
   const [streamStatus, setStreamStatus] = useState("");
+  const [programFlash, setProgramFlash] = useState(false);
   const [leftWidth, setLeftWidth] = useState(280);
   const [rightWidth, setRightWidth] = useState(320);
   const [showRightPanel, setShowRightPanel] = useState(true);
@@ -249,6 +250,8 @@ export default function ControlPage() {
   const handleTake = () => {
     setActiveCameraId(previewCameraId);
     socket.emit("control:camera", previewCameraId);
+    setProgramFlash(true);
+    setTimeout(() => setProgramFlash(false), 400);
   };
 
   const changeTransition = (transition: CameraTransition) => {
@@ -389,6 +392,37 @@ export default function ControlPage() {
     }
   };
 
+  // Keyboard shortcuts: Space=TAKE, Arrow=slide, S=nextSong
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+      switch (e.code) {
+        case "Space":
+          e.preventDefault();
+          handleTake();
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          triggerSlide("next");
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          triggerSlide("previous");
+          break;
+        case "KeyS":
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            handleNextSong();
+          }
+          break;
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
+
   const onMouseDown = useCallback((side: "left" | "right", e: React.MouseEvent) => {
     e.preventDefault();
     draggingRef.current = side;
@@ -426,6 +460,9 @@ export default function ControlPage() {
         badge={connected ? "Live Sync" : "Offline"}
         currentSong={activeSong.title}
         isLive={isLive}
+        cameraCount={cameras.length}
+        onlineCameraCount={cameras.filter((c) => c.status === "online").length}
+        activeScene={activeScene}
         showRightPanel={showRightPanel}
         onToggleRightPanel={() => setShowRightPanel((s) => !s)}
       />
@@ -444,7 +481,7 @@ export default function ControlPage() {
         <div className="control-center">
           <div className="program-preview-stack">
             {/* PROGRAM (LIVE) */}
-            <div className="program-box">
+            <div className={`program-box${programFlash ? " flash" : ""}`}>
               <span className="box-label">Program (Live)</span>
               <div className="box-content">
                 {streamByCamera[activeCamera?.id] ? (
@@ -495,7 +532,7 @@ export default function ControlPage() {
 
             {/* TAKE button */}
             <button type="button" className="button take" onClick={handleTake}>
-              TAKE
+              TAKE <kbd>Space</kbd>
             </button>
 
             {/* OVERLAY LAYOUT CONTROLS */}
@@ -528,7 +565,7 @@ export default function ControlPage() {
         {/* RIGHT: PRODUCTION CONTROLS */}
         {showRightPanel && (
         <div className="control-right">
-          <CameraPreviewPanel cameras={cameras} activeCameraId={previewCameraId} onSelectCamera={selectCamera} onRemoveCamera={handleRemoveCamera} />
+          <CameraPreviewPanel cameras={cameras} activeCameraId={previewCameraId} programCameraId={activeCameraId} onSelectCamera={selectCamera} onRemoveCamera={handleRemoveCamera} onHoverCamera={(id) => id && setPreviewCameraId(id)} />
           <CameraTransitionPanel transition={cameraTransition} onChangeTransition={changeTransition} />
           <SceneControlPanel activeScene={activeScene} onSceneChange={triggerScene} />
           <LivestreamStudioPanel
@@ -568,13 +605,13 @@ export default function ControlPage() {
       {/* BOTTOM CONTROL BAR */}
       <div className="control-bar">
         <button type="button" className="button outline" onClick={() => triggerSlide("previous")}>
-          Prev Slide
+          ◀ Prev Slide <kbd>←</kbd>
         </button>
         <button type="button" className="button primary" onClick={() => triggerSlide("next")}>
-          Next Slide
+          Next Slide ▶ <kbd>→</kbd>
         </button>
         <button type="button" className="button success" onClick={handleNextSong}>
-          Next Song
+          Next Song <kbd>S</kbd>
         </button>
         <button type="button" className="button subtle" onClick={() => triggerScene(activeScene)}>
           Scene: {activeScene}

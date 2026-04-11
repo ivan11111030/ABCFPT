@@ -146,20 +146,27 @@ h1, h2, h3, p { margin: 0; }
 
 .button.take {
   width: 100%;
-  font-size: 16px;
-  font-weight: 700;
-  padding: 14px;
-  border-radius: 10px;
+  font-size: 20px;
+  font-weight: 800;
+  padding: 16px;
+  border-radius: 12px;
   background: var(--danger);
   color: white;
   border: none;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
+  box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);
 }
 
 .button.take:hover:not(:disabled) {
   background: #dc2626;
-  box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+  transform: scale(1.04);
+  box-shadow: 0 0 28px rgba(239, 68, 68, 0.6);
+}
+
+.button.take:active:not(:disabled) {
+  transform: scale(0.97);
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
 }
 
 /* ========== STATUS INDICATORS ========== */
@@ -402,16 +409,19 @@ h1, h2, h3, p { margin: 0; }
   gap: var(--sp-2);
 }
 
-/* ========== BOTTOM CONTROL BAR ========== */
+/* ========== BOTTOM CONTROL BAR (Production Dock) ========== */
 .control-bar {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: var(--sp-2);
-  padding: var(--sp-1) var(--sp-3);
+  padding: 10px var(--sp-3);
   background: var(--panel);
   border-top: 1px solid var(--border);
   min-height: 52px;
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
 }
 
 .control-bar .button {
@@ -468,6 +478,7 @@ h1, h2, h3, p { margin: 0; }
 .setlist-item.active {
   background: rgba(34, 197, 94, 0.08);
   border-color: var(--success);
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.2);
 }
 
 .setlist-item.dragging {
@@ -518,9 +529,19 @@ h1, h2, h3, p { margin: 0; }
 }
 
 .program-box {
-  border: 2px solid var(--danger);
+  border: 3px solid var(--danger);
   background: #000;
   min-height: 200px;
+  box-shadow: 0 0 24px rgba(239, 68, 68, 0.35), inset 0 0 30px rgba(239, 68, 68, 0.05);
+}
+
+.program-box.flash {
+  animation: program-flash 0.25s ease;
+}
+
+@keyframes program-flash {
+  0% { opacity: 0.5; box-shadow: 0 0 40px rgba(239, 68, 68, 0.8); }
+  100% { opacity: 1; box-shadow: 0 0 24px rgba(239, 68, 68, 0.35); }
 }
 
 .preview-box {
@@ -592,8 +613,8 @@ h1, h2, h3, p { margin: 0; }
 
 .camera-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--sp-1);
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
 }
 
 .camera-card {
@@ -606,20 +627,32 @@ h1, h2, h3, p { margin: 0; }
   border: 2px solid transparent;
   background: var(--card);
   cursor: pointer;
-  transition: border-color 0.3s, box-shadow 0.3s;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s ease;
 }
 
 .camera-card:hover {
   border-color: rgba(79, 195, 247, 0.4);
+  transform: translateY(-2px);
 }
 
+/* Tally light: active = program (red), preview = green */
 .camera-card.active {
   border-color: var(--success);
-  box-shadow: 0 0 12px rgba(34, 197, 94, 0.2);
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.25);
+}
+
+.camera-card.tally-program {
+  border-color: var(--danger);
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.4);
+}
+
+.camera-card.tally-preview {
+  border-color: var(--success);
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.25);
 }
 
 .camera-thumbnail {
-  height: 60px;
+  aspect-ratio: 16 / 9;
   border-radius: 8px;
   background: rgba(79, 195, 247, 0.06);
   display: grid;
@@ -627,6 +660,7 @@ h1, h2, h3, p { margin: 0; }
   color: var(--accent);
   font-size: var(--font-label);
   font-weight: 700;
+  overflow: hidden;
 }
 
 .camera-meta {
@@ -1545,7 +1579,7 @@ h1, h2, h3, p { margin: 0; }
 .camera-card,
 .program-box,
 .preview-box {
-  transition: all 300ms ease;
+  transition: all 200ms ease;
 }
 
 .slide-text,
@@ -1557,6 +1591,21 @@ h1, h2, h3, p { margin: 0; }
 @keyframes slide-fade {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* Micro animations — hover lifts */
+.card:hover,
+.song-card:hover,
+.slide-list-item:hover,
+.scene-button:hover {
+  transform: translateY(-1px);
+}
+
+.song-card,
+.slide-list-item,
+.scene-button,
+.setlist-item {
+  transition: all 0.15s ease;
 }
 
 /* ========== RESPONSIVE: TABLET ========== */
@@ -1842,4 +1891,20 @@ h1, h2, h3, p { margin: 0; }
 .overlay-presets .button {
   font-size: var(--fs-xs);
   padding: var(--sp-1) var(--sp-2);
+}
+
+/* Keyboard shortcut hints */
+kbd {
+  display: inline-block;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  margin-left: 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--muted);
+  vertical-align: middle;
+  line-height: 1.3;
 }

@@ -8,11 +8,14 @@ type TopBarProps = {
   badge: string;
   currentSong?: string;
   isLive?: boolean;
+  cameraCount?: number;
+  onlineCameraCount?: number;
+  activeScene?: string;
   showRightPanel?: boolean;
   onToggleRightPanel?: () => void;
 };
 
-export function TopBar({ title, badge, currentSong, isLive, showRightPanel, onToggleRightPanel }: TopBarProps) {
+export function TopBar({ title, badge, currentSong, isLive, cameraCount, onlineCameraCount, activeScene, showRightPanel, onToggleRightPanel }: TopBarProps) {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -40,6 +43,16 @@ export function TopBar({ title, badge, currentSong, isLive, showRightPanel, onTo
         </nav>
       </div>
       <div className="topbar-info">
+        {activeScene && (
+          <span style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, background: "rgba(79,195,247,0.12)", color: "var(--accent)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            {activeScene}
+          </span>
+        )}
+        {cameraCount !== undefined && (
+          <span style={{ fontSize: 12, color: "var(--muted)" }}>
+            📷 {onlineCameraCount ?? 0}/{cameraCount}
+          </span>
+        )}
         {currentSong && (
           <span className="topbar-song">
             Now: <strong>{currentSong}</strong>
