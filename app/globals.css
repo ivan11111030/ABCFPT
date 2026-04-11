@@ -554,6 +554,7 @@ h1, h2, h3, p { margin: 0; }
 }
 
 .box-content {
+  position: relative;
   display: grid;
   place-items: center;
   min-height: inherit;
@@ -1728,4 +1729,117 @@ h1, h2, h3, p { margin: 0; }
   .teleprompter-stage {
     padding: var(--sp-3);
   }
+}
+
+/* ─── Draggable Overlay ─── */
+.draggable-overlay {
+  position: absolute;
+  z-index: 20;
+  transition: box-shadow 0.15s ease;
+}
+
+.draggable-overlay.interactive {
+  cursor: grab;
+}
+
+.draggable-overlay.interactive:hover {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.draggable-overlay.dragging {
+  cursor: grabbing;
+  box-shadow: 0 0 0 2px var(--accent), 0 4px 16px rgba(0,0,0,0.3);
+}
+
+.overlay-resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+  background: transparent;
+}
+
+.draggable-overlay.interactive .overlay-resize-handle:hover {
+  background: var(--accent-alpha);
+}
+
+.overlay-lyrics {
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-md);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  text-align: center;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.overlay-lyrics p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.overlay-section {
+  display: block;
+  margin-top: var(--sp-1);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+/* Projector overlay needs larger text */
+.projector-overlay-lyrics {
+  font-size: clamp(1.4rem, 3vw, 2.4rem);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-lg);
+}
+
+.projector-overlay-lyrics .overlay-section {
+  font-size: clamp(0.9rem, 1.5vw, 1.2rem);
+}
+
+/* Projector video background */
+.projector-video-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+
+.projector-screen {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Overlay controls row in control page */
+.overlay-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: var(--sp-2) 0;
+}
+
+.overlay-controls-label {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.overlay-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+
+.overlay-presets .button {
+  font-size: var(--fs-xs);
+  padding: var(--sp-1) var(--sp-2);
 }

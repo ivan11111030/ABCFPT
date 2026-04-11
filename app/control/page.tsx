@@ -16,6 +16,7 @@ import { CameraDiscoveryPanel } from "@/src/components/CameraDiscoveryPanel";
 import { MobileCameraInvitePanel } from "@/src/components/MobileCameraInvitePanel";
 import { LivestreamStudioPanel } from "@/src/components/LivestreamStudioPanel";
 import { LocalCameraPanel } from "@/src/components/LocalCameraPanel";
+import { DraggableOverlay, LAYOUT_PRESETS, type OverlayLayout, type OverlayPosition } from "@/src/components/DraggableOverlay";
 import { createSocketClient } from "@/src/lib/socket";
 import { sampleCameras, sampleSongs } from "@/src/lib/fakeData";
 import type { Camera, CameraTransition, SceneMode, Song } from "@/src/types/production";
@@ -47,6 +48,9 @@ export default function ControlPage() {
   const [showRightPanel, setShowRightPanel] = useState(true);
   const [localStreams, setLocalStreams] = useState<Record<string, MediaStream>>({});
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
+  const [overlayEnabled, setOverlayEnabled] = useState(true);
+  const [overlayLayout, setOverlayLayout] = useState<OverlayLayout>("lower-third");
+  const [overlayPos, setOverlayPos] = useState<OverlayPosition>(LAYOUT_PRESETS["lower-third"]);
   const draggingRef = useRef<"left" | "right" | null>(null);
   const startXRef = useRef(0);
   const startWidthRef = useRef(0);
@@ -285,7 +289,24 @@ export default function ControlPage() {
   };
 
   const toggleOverlay = () => {
-    socket.emit("stream:toggleOverlay", { enabled: true });
+    const next = !overlayEnabled;
+    setOverlayEnabled(next);
+    socket.emit("stream:toggleOverlay", { enabled: next, position: overlayPos });
+  };
+
+  const changeOverlayLayout = (layout: OverlayLayout) => {
+    setOverlayLayout(layout);
+    if (layout !== "custom") {
+      const pos = LAYOUT_PRESETS[layout];
+      setOverlayPos(pos);
+      socket.emit("stream:overlayPosition", pos);
+    }
+  };
+
+  const handleOverlayDrag = (pos: OverlayPosition) => {
+    setOverlayLayout("custom");
+    setOverlayPos(pos);
+    socket.emit("stream:overlayPosition", pos);
   };
 
   const triggerSlide = (direction: "previous" | "next") => {
@@ -369,7 +390,17 @@ export default function ControlPage() {
               <span className="box-label">Program (Live)</span>
               <div className="box-content">
                 {streamByCamera[activeCamera?.id] ? (
-                  <video ref={programVideoRef} autoPlay muted playsInline className="program-video" />
+                  <>
+                    <video ref={programVideoRef} autoPlay muted playsInline className="program-video" />
+                    {overlayEnabled && (
+                      <DraggableOverlay position={overlayPos} onPositionChange={handleOverlayDrag}>
+                        <div className="overlay-lyrics">
+                          <p>{activeSong.slides[currentSlide]?.text}</p>
+                          <span className="overlay-section">{activeSong.slides[currentSlide]?.section} • {activeCamera.name}</span>
+                        </div>
+                      </DraggableOverlay>
+                    )}
+                  </>
                 ) : (
                   <div>
                     <p>{activeSong.slides[currentSlide]?.text}</p>
@@ -384,7 +415,17 @@ export default function ControlPage() {
               <span className="box-label">Preview</span>
               <div className="box-content">
                 {streamByCamera[previewCamera?.id] ? (
-                  <video ref={previewVideoRef} autoPlay muted playsInline className="preview-video" />
+                  <>
+                    <video ref={previewVideoRef} autoPlay muted playsInline className="preview-video" />
+                    {overlayEnabled && (
+                      <DraggableOverlay position={overlayPos} interactive={false}>
+                        <div className="overlay-lyrics">
+                          <p>{activeSong.slides[currentSlide + 1]?.text ?? "End of song"}</p>
+                          <span className="overlay-section">{previewCamera.name}</span>
+                        </div>
+                      </DraggableOverlay>
+                    )}
+                  </>
                 ) : (
                   <div>
                     <p>{activeSong.slides[currentSlide + 1]?.text ?? "End of song"}</p>
@@ -398,6 +439,26 @@ export default function ControlPage() {
             <button type="button" className="button take" onClick={handleTake}>
               TAKE
             </button>
+
+            {/* OVERLAY LAYOUT CONTROLS */}
+            <div className="overlay-controls">
+              <div className="overlay-controls-row">
+                <span className="overlay-controls-label">Lyrics Overlay</span>
+                <button type="button" className={`button ${overlayEnabled ? "success" : "outline"}`} style={{ padding: "6px 12px", fontSize: 12 }} onClick={toggleOverlay}>
+                  {overlayEnabled ? "ON" : "OFF"}
+                </button>
+              </div>
+              {overlayEnabled && (
+                <div className="overlay-presets">
+                  {(["lower-third", "top-bar", "pip-corner", "full"] as const).map((l) => (
+                    <button key={l} type="button" className={`button ${overlayLayout === l ? "primary" : "subtle"}`} style={{ padding: "6px 10px", fontSize: 11 }} onClick={() => changeOverlayLayout(l)}>
+                      {l === "lower-third" ? "Lower Third" : l === "top-bar" ? "Top Bar" : l === "pip-corner" ? "PIP Corner" : "Full"}
+                    </button>
+                  ))}
+                  {overlayLayout === "custom" && <span style={{ fontSize: 11, color: "var(--accent)" }}>Custom (drag to move)</span>}
+                </div>
+              )}
+            </div>
           </div>
 
           <LyricsPreviewPanel song={activeSong} currentSlide={currentSlide} onJumpToSlide={jumpToSection} />

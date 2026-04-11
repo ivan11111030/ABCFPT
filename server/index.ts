@@ -101,6 +101,10 @@ io.on("connection", (socket: Socket) => {
     socket.broadcast.emit("stream:overlayToggled", payload);
   });
 
+  socket.on("stream:overlayPosition", (payload: Record<string, unknown>) => {
+    socket.broadcast.emit("stream:overlayPosition", payload);
+  });
+
   socket.on("camera:add", (camera: Record<string, unknown>) => {
     socket.broadcast.emit("camera:added", camera);
   });
