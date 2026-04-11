@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Camera } from "@/src/types/production";
 
 type LocalCameraPanelProps = {
-  onAddCamera: (camera: Camera) => void;
+  onAddCamera: (camera: Camera, stream?: MediaStream) => void;
 };
 
 type DetectedDevice = {
@@ -85,8 +85,7 @@ export function LocalCameraPanel({ onAddCamera }: LocalCameraPanelProps) {
       supportsPTZ: false,
       signalStrength: "good",
     };
-    onAddCamera(camera);
-    stopPreview();
+    onAddCamera(camera, streamRef.current ?? undefined);
   };
 
   useEffect(() => {

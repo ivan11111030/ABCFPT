@@ -34,16 +34,26 @@ function MobileCameraInner() {
   const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
-    socket.on("connect", () => {
-      setStatus("connected");
+    const emitJoin = () => {
       socket.emit("mobile-camera:join", {
         device: navigator.userAgent,
         cameraName,
         supportedResolutions: ["720p", "1080p"],
       });
+    };
+
+    socket.on("connect", () => {
+      setStatus("connected");
+      emitJoin();
     });
 
     socket.on("disconnect", () => setStatus("disconnected"));
+
+    // If socket was already connected before listeners were attached, join immediately.
+    if (socket.connected) {
+      setStatus("connected");
+      emitJoin();
+    }
     socket.on("mobile-camera:answer", async (description: RTCSessionDescriptionInit) => {
       if (pcRef.current) {
         await pcRef.current.setRemoteDescription(new RTCSessionDescription(description));
@@ -62,7 +72,7 @@ function MobileCameraInner() {
       socket.off("mobile-camera:answer");
       socket.off("mobile-camera:candidate");
     };
-  }, []);
+  }, [cameraName]);
 
   const startLocalCamera = async (overrideFacing?: "user" | "environment") => {
     setStreamState("starting");
@@ -78,6 +88,18 @@ function MobileCameraInner() {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
+      socket.emit("camera:add", {
+        id: `camera-phone-${Date.now()}`,
+        name: cameraName,
+        protocol: "WebRTC",
+        ipAddress: "",
+        streamUrl: "webrtc://mobile",
+        status: "online",
+        supportsPTZ: false,
+        isMobile: true,
+        enabled: true,
+        signalStrength: "good",
+      });
       setCameraEnabled(true);
       setStreamState("ready");
     } catch (error) {
@@ -121,18 +143,6 @@ function MobileCameraInner() {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     socket.emit("mobile-camera:offer", offer);
-    socket.emit("camera:add", {
-      id: `camera-phone-${Date.now()}`,
-      name: cameraName,
-      protocol: "WebRTC",
-      ipAddress: "",
-      streamUrl: "webrtc://mobile",
-      status: "online",
-      supportsPTZ: false,
-      isMobile: true,
-      enabled: true,
-      signalStrength: "good",
-    });
     setStreamState("connecting");
   };
 

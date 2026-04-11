@@ -38,9 +38,12 @@ export default function ControlPage() {
   const [leftWidth, setLeftWidth] = useState(280);
   const [rightWidth, setRightWidth] = useState(320);
   const [showRightPanel, setShowRightPanel] = useState(true);
+  const [localStreams, setLocalStreams] = useState<Record<string, MediaStream>>({});
   const draggingRef = useRef<"left" | "right" | null>(null);
   const startXRef = useRef(0);
   const startWidthRef = useRef(0);
+  const programVideoRef = useRef<HTMLVideoElement>(null);
+  const previewVideoRef = useRef<HTMLVideoElement>(null);
 
   const router = useRouter();
 
@@ -66,21 +69,25 @@ export default function ControlPage() {
     socket.on("mobile-camera:joined", (mobileCameraData: any) => {
       const mobileId = `mobile-${Date.now()}`;
       const mobileName = mobileCameraData.cameraName || `Mobile Camera (${mobileCameraData.device || "Remote"})`;
-      setCameras((prev) => [
-        ...prev,
-        {
-          id: mobileId,
-          name: mobileName,
-          protocol: "WebRTC" as const,
-          ipAddress: "",
-          streamUrl: "webrtc://mobile",
-          status: "online" as const,
-          supportsPTZ: false,
-          isMobile: true,
-          enabled: true,
-          signalStrength: "good" as const,
-        },
-      ]);
+      setCameras((prev) => {
+        const alreadyExists = prev.some((c) => c.name === mobileName && c.isMobile);
+        if (alreadyExists) return prev;
+        return [
+          ...prev,
+          {
+            id: mobileId,
+            name: mobileName,
+            protocol: "WebRTC" as const,
+            ipAddress: "",
+            streamUrl: "webrtc://mobile",
+            status: "online" as const,
+            supportsPTZ: false,
+            isMobile: true,
+            enabled: true,
+            signalStrength: "good" as const,
+          },
+        ];
+      });
     });
 
     return () => {
@@ -137,19 +144,56 @@ export default function ControlPage() {
     setSongs(nextSongs);
   };
 
-  const handleAddCamera = (camera: Camera) => {
+  const handleAddCamera = (camera: Camera, stream?: MediaStream) => {
     setCameras((prev) => (prev.some((item) => item.id === camera.id) ? prev : [...prev, camera]));
+    if (stream) {
+      setLocalStreams((prev) => ({ ...prev, [camera.id]: stream }));
+    }
   };
 
   const handleRemoveCamera = (cameraId: string) => {
-    setCameras((prev) => prev.filter((c) => c.id !== cameraId));
-    if (activeCameraId === cameraId) {
-      setActiveCameraId(cameras[0]?.id ?? "");
-    }
-    if (previewCameraId === cameraId) {
-      setPreviewCameraId(cameras[0]?.id ?? "");
-    }
+    setCameras((prev) => {
+      const next = prev.filter((c) => c.id !== cameraId);
+      const fallbackId = next[0]?.id ?? "";
+      if (activeCameraId === cameraId) {
+        setActiveCameraId(fallbackId);
+      }
+      if (previewCameraId === cameraId) {
+        setPreviewCameraId(fallbackId);
+      }
+      return next;
+    });
+
+    setLocalStreams((prev) => {
+      const next = { ...prev };
+      const stream = next[cameraId];
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+      delete next[cameraId];
+      return next;
+    });
   };
+
+  useEffect(() => {
+    const stream = localStreams[activeCameraId];
+    if (programVideoRef.current) {
+      programVideoRef.current.srcObject = stream ?? null;
+    }
+  }, [activeCameraId, localStreams]);
+
+  useEffect(() => {
+    const stream = localStreams[previewCameraId];
+    if (previewVideoRef.current) {
+      previewVideoRef.current.srcObject = stream ?? null;
+    }
+  }, [previewCameraId, localStreams]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(localStreams).forEach((stream) => stream.getTracks().forEach((track) => track.stop()));
+    };
+  }, [localStreams]);
 
   const startStream = () => {
     setIsLive(true);
@@ -245,10 +289,14 @@ export default function ControlPage() {
             <div className="program-box">
               <span className="box-label">Program (Live)</span>
               <div className="box-content">
-                <div>
-                  <p>{activeSong.slides[currentSlide]?.text}</p>
-                  <p className="camera-name">{activeCamera.name}</p>
-                </div>
+                {activeCamera?.streamUrl?.startsWith("local://") ? (
+                  <video ref={programVideoRef} autoPlay muted playsInline className="program-video" />
+                ) : (
+                  <div>
+                    <p>{activeSong.slides[currentSlide]?.text}</p>
+                    <p className="camera-name">{activeCamera.name}</p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -256,10 +304,14 @@ export default function ControlPage() {
             <div className="preview-box">
               <span className="box-label">Preview</span>
               <div className="box-content">
-                <div>
-                  <p>{activeSong.slides[currentSlide + 1]?.text ?? "End of song"}</p>
-                  <p className="camera-name">{previewCamera.name}</p>
-                </div>
+                {previewCamera?.streamUrl?.startsWith("local://") ? (
+                  <video ref={previewVideoRef} autoPlay muted playsInline className="preview-video" />
+                ) : (
+                  <div>
+                    <p>{activeSong.slides[currentSlide + 1]?.text ?? "End of song"}</p>
+                    <p className="camera-name">{previewCamera.name}</p>
+                  </div>
+                )}
               </div>
             </div>
 
