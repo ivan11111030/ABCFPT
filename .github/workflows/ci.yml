@@ -27,6 +27,8 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          NEXT_PUBLIC_SOCKET_SERVER_URL: ${{ secrets.SOCKET_SERVER_URL }}
 
       - name: Add .nojekyll
         run: touch out/.nojekyll
