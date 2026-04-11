@@ -1416,31 +1416,27 @@ h1, h2, h3, p { margin: 0; }
 
 .logo-row {
   display: flex;
-  gap: 14px;
+  gap: 18px;
   justify-content: center;
   align-items: center;
 }
 
-.logo-box {
-  width: 118px;
-  height: 118px;
-  border-radius: 20px;
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(148, 163, 184, 0.04));
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-.logo-box img {
-  width: 100%;
-  height: 100%;
+.logo-img {
+  border-radius: 18px;
   object-fit: contain;
+  display: block;
 }
 
-.logo-box-wide {
-  width: 152px;
+.logo-img-square {
+  width: 100px;
+  height: 100px;
+}
+
+.logo-img-wide {
+  height: 100px;
+  width: auto;
+  max-width: 180px;
+  border-radius: 14px;
 }
 
 .auth-title-block {
@@ -1722,13 +1718,14 @@ h1, h2, h3, p { margin: 0; }
     border-radius: 20px;
   }
 
-  .logo-box {
-    width: 96px;
-    height: 96px;
+  .logo-img-square {
+    width: 76px;
+    height: 76px;
   }
 
-  .logo-box-wide {
-    width: 126px;
+  .logo-img-wide {
+    height: 76px;
+    max-width: 140px;
   }
 
   .auth-actions {

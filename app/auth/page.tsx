@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -13,6 +12,8 @@ import {
 } from "firebase/auth";
 import { auth } from "@/src/lib/firebase";
 import { useAuth } from "@/src/lib/useAuth";
+
+const BASE = process.env.NEXT_PUBLIC_BASE_PATH || "/ABCFPT";
 
 export default function AuthPage() {
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -85,16 +86,24 @@ export default function AuthPage() {
       <section className="auth-card">
         <header className="auth-brand-row">
           <div className="logo-row" aria-label="ABCF brand mark">
-            <div className="logo-box">
-              <Image src="/logo-left.png" alt="ABCF logo left" width={120} height={120} priority />
-            </div>
-            <div className="logo-box logo-box-wide">
-              <Image src="/logo-right.png" alt="ABCF logo right" width={120} height={120} priority />
-            </div>
+            <img
+              className="logo-img logo-img-square"
+              src={`${BASE}/logo-left.png`}
+              alt="ABCF Church logo"
+              width={120}
+              height={120}
+            />
+            <img
+              className="logo-img logo-img-wide"
+              src={`${BASE}/logo-right.png`}
+              alt="ABCF Production Team logo"
+              width={180}
+              height={120}
+            />
           </div>
           <div className="auth-title-block">
             <h1>{mode === "login" ? "Welcome Back" : "Create Your Account"}</h1>
-            <p>Sign in to manage your livestream scenes, lyrics, and camera routing.</p>
+            <p>Manage your livestream scenes, lyrics, and camera routing.</p>
           </div>
         </header>
 

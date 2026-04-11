@@ -8,6 +8,7 @@ const nextConfig = {
     unoptimized: true
   },
   env: {
+    NEXT_PUBLIC_BASE_PATH: "/ABCFPT",
     SOCKET_SERVER_URL: process.env.SOCKET_SERVER_URL || "http://localhost:4000"
   }
 };
