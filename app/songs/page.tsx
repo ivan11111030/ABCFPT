@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createSocketClient } from "@/src/lib/socket";
-import { sampleSongs } from "@/src/lib/fakeData";
+import * as songStore from "@/src/lib/songStore";
 import { parseFile } from "@/src/lib/songParser";
 import { SongManagementPanel } from "@/src/components/SongManagementPanel";
 import type { Song } from "@/src/types/production";
@@ -11,18 +11,23 @@ import type { Song } from "@/src/types/production";
 const socket = createSocketClient();
 
 export default function SongsPage() {
-  const [songs, setSongs] = useState<Song[]>(sampleSongs);
+  const [songs, setSongs] = useState<Song[]>(songStore.getSongs);
   const [importStatus, setImportStatus] = useState("");
 
   useEffect(() => {
     socket.on("state:sync", (serverState: any) => {
-      if (serverState.songs?.length) setSongs(serverState.songs);
+      if (serverState.songs?.length) songStore.mergeFromServer(serverState.songs);
     });
-    socket.on("song:list", (songList: Song[]) => setSongs(songList));
+    socket.on("song:list", (songList: Song[]) => songStore.setSongs(songList));
+
+    const unsubscribe = songStore.subscribe(() => {
+      setSongs(songStore.getSongs());
+    });
 
     return () => {
       socket.off("state:sync");
       socket.off("song:list");
+      unsubscribe();
     };
   }, []);
 
@@ -46,6 +51,9 @@ export default function SongsPage() {
     }
 
     if (imported.length > 0) {
+      for (const song of imported) {
+        songStore.addSong(song);
+      }
       socket.emit("song:import", imported);
       setImportStatus(`✓ Imported ${imported.length} song(s) successfully.`);
     }
@@ -57,14 +65,17 @@ export default function SongsPage() {
   };
 
   const handleAddSong = (song: Song) => {
+    songStore.addSong(song);
     socket.emit("song:add", song);
   };
 
   const handleUpdateSong = (song: Song) => {
+    songStore.updateSong(song);
     socket.emit("song:update", song);
   };
 
   const handleDeleteSong = (songId: string) => {
+    songStore.deleteSong(songId);
     socket.emit("song:delete", songId);
   };
 

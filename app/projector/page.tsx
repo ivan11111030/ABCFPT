@@ -3,15 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createSocketClient } from "@/src/lib/socket";
-import { sampleSongs } from "@/src/lib/fakeData";
+import * as songStore from "@/src/lib/songStore";
 import { DraggableOverlay, LAYOUT_PRESETS, type OverlayPosition } from "@/src/components/DraggableOverlay";
 import type { Song } from "@/src/types/production";
 
 const socket = createSocketClient();
 
 export default function ProjectorPage() {
-  const [songs, setSongs] = useState<Song[]>(sampleSongs);
-  const [currentSongId, setCurrentSongId] = useState(sampleSongs[0].id);
+  const [songs, setSongs] = useState<Song[]>(songStore.getSongs);
+  const [currentSongId, setCurrentSongId] = useState(() => songStore.getSongs()[0]?.id ?? "");
   const [slideIndex, setSlideIndex] = useState(0);
   const [overlayEnabled, setOverlayEnabled] = useState(true);
   const [overlayPos, setOverlayPos] = useState<OverlayPosition>(LAYOUT_PRESETS["lower-third"]);
@@ -33,7 +33,7 @@ export default function ProjectorPage() {
     // Full state sync from server on connect
     socket.on("state:sync", (serverState: any) => {
       setConnected(true);
-      if (serverState.songs?.length) setSongs(serverState.songs);
+      if (serverState.songs?.length) songStore.mergeFromServer(serverState.songs);
       if (serverState.currentSongId) setCurrentSongId(serverState.currentSongId);
       if (serverState.currentSlide !== undefined) setSlideIndex(serverState.currentSlide);
       if (serverState.overlayEnabled !== undefined) setOverlayEnabled(serverState.overlayEnabled);
@@ -49,7 +49,7 @@ export default function ProjectorPage() {
       setCurrentSongId(songId);
       setSlideIndex(0);
     });
-    socket.on("song:list", (songList: Song[]) => setSongs(songList));
+    socket.on("song:list", (songList: Song[]) => songStore.setSongs(songList));
     socket.on("control:scene", (payload: any) => {
       const scene = typeof payload === "string" ? payload : payload.scene;
       if (scene) setActiveScene(scene);
@@ -100,6 +100,10 @@ export default function ProjectorPage() {
       }
     });
 
+    const unsubscribe = songStore.subscribe(() => {
+      setSongs(songStore.getSongs());
+    });
+
     return () => {
       socket.off("connect");
       socket.off("disconnect");
@@ -115,6 +119,7 @@ export default function ProjectorPage() {
       socket.off("projector:offer");
       socket.off("projector:candidate");
       pcRef.current?.close();
+      unsubscribe();
     };
   }, []);
 

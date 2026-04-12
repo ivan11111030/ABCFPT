@@ -21,7 +21,8 @@ import { DraggableOverlay, LAYOUT_PRESETS, type OverlayLayout, type OverlayPosit
 import { getIceServers } from "@/src/lib/realtimeConfig";
 import { createSocketClient } from "@/src/lib/socket";
 import * as camStore from "@/src/lib/cameraStreamStore";
-import { sampleCameras, sampleSongs } from "@/src/lib/fakeData";
+import * as songStore from "@/src/lib/songStore";
+import { sampleCameras } from "@/src/lib/fakeData";
 import { parseFile } from "@/src/lib/songParser";
 import type { Camera, CameraTransition, SceneMode, Song } from "@/src/types/production";
 
@@ -36,8 +37,8 @@ type SignalingPayload = {
 };
 
 export default function ControlPage() {
-  const [songs, setSongs] = useState<Song[]>(sampleSongs);
-  const [activeSongId, setActiveSongId] = useState(sampleSongs[0].id);
+  const [songs, setSongs] = useState<Song[]>(songStore.getSongs);
+  const [activeSongId, setActiveSongId] = useState(() => songStore.getSongs()[0]?.id ?? "");
   const [activeScene, setActiveScene] = useState<SceneMode>("worship");
   const [activeCameraId, setActiveCameraId] = useState<string>(sampleCameras[0].id);
   const [previewCameraId, setPreviewCameraId] = useState<string>(sampleCameras[1]?.id ?? sampleCameras[0].id);
@@ -83,7 +84,7 @@ export default function ControlPage() {
     // Full state sync from server on connect
     socket.on("state:sync", (serverState: any) => {
       setConnected(true);
-      if (serverState.songs?.length) setSongs(serverState.songs);
+      if (serverState.songs?.length) songStore.mergeFromServer(serverState.songs);
       if (serverState.currentSongId) setActiveSongId(serverState.currentSongId);
       if (serverState.currentSlide !== undefined) setCurrentSlide(serverState.currentSlide);
       if (serverState.currentScene) setActiveScene(serverState.currentScene);
@@ -103,7 +104,7 @@ export default function ControlPage() {
     socket.on("control:camera", (cameraId: string) => setActiveCameraId(cameraId));
     socket.on("control:scene", (payload: any) => { const scene = typeof payload === "string" ? payload : payload.scene; if (scene) setActiveScene(scene); });
     socket.on("camera:list", (cameraList: Camera[]) => setCameras(cameraList));
-    socket.on("song:list", (songList: Song[]) => setSongs(songList));
+    socket.on("song:list", (songList: Song[]) => songStore.setSongs(songList));
     socket.on("stream:started", () => { setIsLive(true); setStreamStatus("Live"); });
     socket.on("stream:stopped", () => { setIsLive(false); setStreamStatus("Stopped"); });
     socket.on("stream:error", (err: { message: string }) => { setStreamStatus(err.message); setIsLive(false); });
@@ -192,15 +193,20 @@ export default function ControlPage() {
     });
 
     // Sync global store changes back into local React state so the UI re-renders
-    const unsubscribeStore = camStore.subscribe(() => {
+    const unsubscribeCamStore = camStore.subscribe(() => {
       setLocalStreams(camStore.getLocalStreams());
       setRemoteStreams(camStore.getRemoteStreams());
       setSnapshotFrames(camStore.getSnapshotFrames());
     });
 
+    const unsubscribeSongStore = songStore.subscribe(() => {
+      setSongs(songStore.getSongs());
+    });
+
     return () => {
       unsubscribeAuth();
-      unsubscribeStore();
+      unsubscribeCamStore();
+      unsubscribeSongStore();
       socket.off("connect");
       socket.off("disconnect");
       socket.off("state:sync");
@@ -225,7 +231,8 @@ export default function ControlPage() {
     };
   }, [router]);
 
-  const activeSong = useMemo(() => songs.find((song) => song.id === activeSongId) ?? songs[0], [activeSongId, songs]);
+  const EMPTY_SONG: Song = { id: "", title: "No Song", artist: "", key: "C", tempo: 0, currentSection: "", slides: [{ id: "empty", section: "", text: "" }], favorite: false };
+  const activeSong = useMemo(() => songs.find((song) => song.id === activeSongId) ?? songs[0] ?? EMPTY_SONG, [activeSongId, songs]);
   const activeCamera = useMemo(() => cameras.find((c) => c.id === activeCameraId) ?? cameras[0], [activeCameraId, cameras]);
   const previewCamera = useMemo(() => cameras.find((c) => c.id === previewCameraId) ?? cameras[1] ?? cameras[0], [previewCameraId, cameras]);
 
@@ -285,7 +292,7 @@ export default function ControlPage() {
     const nextSongs = [...songs];
     const [movedSong] = nextSongs.splice(sourceIndex, 1);
     nextSongs.splice(targetIndex, 0, movedSong);
-    setSongs(nextSongs);
+    songStore.setSongs(nextSongs);
     socket.emit("song:reorder", nextSongs.map((s) => s.id));
   };
 
@@ -293,14 +300,26 @@ export default function ControlPage() {
     for (const file of Array.from(files)) {
       try {
         const song = await parseFile(file);
-        if (song) socket.emit("song:add", song);
+        if (song) {
+          songStore.addSong(song);
+          socket.emit("song:add", song);
+        }
       } catch { /* skip */ }
     }
   };
 
-  const handleAddSong = (song: Song) => socket.emit("song:add", song);
-  const handleUpdateSong = (song: Song) => socket.emit("song:update", song);
-  const handleDeleteSong = (songId: string) => socket.emit("song:delete", songId);
+  const handleAddSong = (song: Song) => {
+    songStore.addSong(song);
+    socket.emit("song:add", song);
+  };
+  const handleUpdateSong = (song: Song) => {
+    songStore.updateSong(song);
+    socket.emit("song:update", song);
+  };
+  const handleDeleteSong = (songId: string) => {
+    songStore.deleteSong(songId);
+    socket.emit("song:delete", songId);
+  };
 
   const handleAddCamera = (camera: Camera, stream?: MediaStream) => {
     setCameras((prev) => (prev.some((item) => item.id === camera.id) ? prev : [...prev, camera]));

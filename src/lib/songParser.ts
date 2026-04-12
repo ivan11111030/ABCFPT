@@ -136,12 +136,37 @@ export async function parsePptxFile(file: File): Promise<Song> {
       if (text) textParts.push(text);
     }
 
+    // Extract speaker notes from the corresponding notesSlide XML
+    let speakerNotes = "";
+    const notesPath = `ppt/notesSlides/notesSlide${entry.num}.xml`;
+    const notesFile = zip.file(notesPath);
+    if (notesFile) {
+      try {
+        const notesXml = await notesFile.async("text");
+        const notesParts: string[] = [];
+        const notesRegex = /<a:t>([\s\S]*?)<\/a:t>/g;
+        let notesMatch: RegExpExecArray | null;
+        while ((notesMatch = notesRegex.exec(notesXml)) !== null) {
+          const nt = notesMatch[1].trim();
+          if (nt) notesParts.push(nt);
+        }
+        // Filter out the auto-generated slide number placeholder text
+        const filtered = notesParts.filter(
+          (t) => !/^\d+$/.test(t) && t !== "<number>" && t.toLowerCase() !== "slide" && t.length > 1
+        );
+        speakerNotes = filtered.join("\n").trim();
+      } catch {
+        // notes file unreadable — skip
+      }
+    }
+
     const slideText = textParts.join("\n").trim();
     if (slideText) {
       slides.push({
         id: `slide-pptx-${Date.now()}-${slides.length}`,
         section: `Slide ${slides.length + 1}`,
         text: slideText,
+        ...(speakerNotes ? { notes: speakerNotes } : {}),
       });
     }
   }
@@ -168,14 +193,30 @@ export async function parsePptxFile(file: File): Promise<Song> {
 }
 
 export async function parseFile(file: File): Promise<Song | null> {
-  const ext = file.name.split(".").pop()?.toLowerCase();
+  try {
+    const ext = file.name.split(".").pop()?.toLowerCase();
 
-  if (ext === "pptx") return parsePptxFile(file);
+    let song: Song | null = null;
 
-  const content = await file.text();
+    if (ext === "pptx") {
+      song = await parsePptxFile(file);
+    } else {
+      const content = await file.text();
+      if (ext === "txt") song = parseTxtFile(content, file.name);
+      else if (ext === "lrc") song = parseLrcFile(content, file.name);
+    }
 
-  if (ext === "txt") return parseTxtFile(content, file.name);
-  if (ext === "lrc") return parseLrcFile(content, file.name);
+    if (!song) return null;
 
-  return null;
+    // Validate: must have a title and at least one slide with text
+    if (!song.title.trim()) song.title = file.name.replace(/\.[^.]+$/, "");
+    if (!song.slides.length) {
+      song.slides = [{ id: `slide-fallback-${Date.now()}`, section: "Slide 1", text: "(Empty file)" }];
+    }
+
+    return song;
+  } catch (err) {
+    console.error(`Failed to parse file "${file.name}":`, err);
+    return null;
+  }
 }

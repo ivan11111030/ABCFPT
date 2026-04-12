@@ -3,14 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createSocketClient } from "@/src/lib/socket";
-import { sampleSongs } from "@/src/lib/fakeData";
+import * as songStore from "@/src/lib/songStore";
 import type { Song } from "@/src/types/production";
 
 const socket = createSocketClient();
 
 export default function TeleprompterPage() {
-  const [songs, setSongs] = useState<Song[]>(sampleSongs);
-  const [currentSongId, setCurrentSongId] = useState(sampleSongs[0].id);
+  const [songs, setSongs] = useState<Song[]>(songStore.getSongs);
+  const [currentSongId, setCurrentSongId] = useState(() => songStore.getSongs()[0]?.id ?? "");
   const [slideIndex, setSlideIndex] = useState(0);
   const [fontSize, setFontSize] = useState(42);
   const [darkMode, setDarkMode] = useState(true);
@@ -25,7 +25,7 @@ export default function TeleprompterPage() {
     // Full state sync from server on connect
     socket.on("state:sync", (serverState: any) => {
       setConnected(true);
-      if (serverState.songs?.length) setSongs(serverState.songs);
+      if (serverState.songs?.length) songStore.mergeFromServer(serverState.songs);
       if (serverState.currentSongId) setCurrentSongId(serverState.currentSongId);
       if (serverState.currentSlide !== undefined) setSlideIndex(serverState.currentSlide);
     });
@@ -36,7 +36,11 @@ export default function TeleprompterPage() {
       setCurrentSongId(songId);
       setSlideIndex(0);
     });
-    socket.on("song:list", (songList: Song[]) => setSongs(songList));
+    socket.on("song:list", (songList: Song[]) => songStore.setSongs(songList));
+
+    const unsubscribe = songStore.subscribe(() => {
+      setSongs(songStore.getSongs());
+    });
 
     return () => {
       socket.off("connect");
@@ -45,6 +49,7 @@ export default function TeleprompterPage() {
       socket.off("control:slide");
       socket.off("control:song");
       socket.off("song:list");
+      unsubscribe();
     };
   }, []);
 

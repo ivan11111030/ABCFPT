@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type DragEvent } from "react";
 import type { Song } from "@/src/types/production";
+import * as songStore from "@/src/lib/songStore";
 
 type SetlistPanelProps = {
   songs: Song[];
@@ -13,6 +14,8 @@ type SetlistPanelProps = {
 export function SetlistPanel({ songs, activeSongId, onSelectSong, onReorder }: SetlistPanelProps) {
   const [draggedSongId, setDraggedSongId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [cloudBusy, setCloudBusy] = useState(false);
+  const [cloudMsg, setCloudMsg] = useState("");
 
   const filteredSongs = useMemo(() => {
     if (!search.trim()) return songs;
@@ -41,11 +44,45 @@ export function SetlistPanel({ songs, activeSongId, onSelectSong, onReorder }: S
     setDraggedSongId(null);
   };
 
+  const handleCloudUpload = async () => {
+    setCloudBusy(true);
+    setCloudMsg("");
+    const r = await songStore.uploadToCloud();
+    setCloudMsg(r.ok ? `⬆ ${r.message}` : `⚠️ ${r.message}`);
+    setCloudBusy(false);
+    setTimeout(() => setCloudMsg(""), 5000);
+  };
+
+  const handleCloudDownload = async () => {
+    setCloudBusy(true);
+    setCloudMsg("");
+    const r = await songStore.downloadFromCloud(true);
+    setCloudMsg(r.ok ? `⬇ ${r.message}` : `⚠️ ${r.message}`);
+    setCloudBusy(false);
+    setTimeout(() => setCloudMsg(""), 5000);
+  };
+
   return (
     <div className="setlist-panel">
       <div className="panel-header">
         <p>Setlist</p>
       </div>
+      <div style={{ display: "flex", gap: 4, padding: "0 0 6px" }}>
+        <button type="button" className="button subtle" disabled={cloudBusy} onClick={handleCloudUpload}
+          title="Upload setlist to cloud" style={{ flex: 1, padding: "4px 6px", fontSize: 11 }}>
+          ⬆ Cloud
+        </button>
+        <button type="button" className="button subtle" disabled={cloudBusy} onClick={handleCloudDownload}
+          title="Download setlist from cloud" style={{ flex: 1, padding: "4px 6px", fontSize: 11 }}>
+          ⬇ Cloud
+        </button>
+      </div>
+      {cloudMsg && (
+        <div style={{ fontSize: 11, padding: "4px 8px", marginBottom: 4, borderRadius: 6,
+          background: cloudMsg.startsWith("⚠️") ? "var(--danger)" : "var(--success)", color: "#fff" }}>
+          {cloudMsg}
+        </div>
+      )}
       <input
         type="search"
         className="setlist-search"

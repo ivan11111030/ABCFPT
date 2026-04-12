@@ -1,5 +1,7 @@
 import express, { type Request, type Response } from "express";
 import http from "http";
+import fs from "fs";
+import path from "path";
 import { Server, type Socket } from "socket.io";
 
 const app = express();
@@ -17,10 +19,11 @@ type SceneMode = "worship" | "speaker" | "announcement" | "lyrics";
 type CameraTransition = "cut" | "fade" | "cross-dissolve";
 type OverlayPosition = { x: number; y: number; width: number };
 
-type Slide = { id: string; section: string; text: string; background?: string };
+type Slide = { id: string; section: string; text: string; notes?: string; background?: string };
 type Song = {
   id: string; title: string; artist: string; key: string;
   tempo: number; currentSection: string; slides: Slide[]; favorite: boolean;
+  updatedAt?: number;
 };
 type Camera = {
   id: string; name: string; protocol: string; ipAddress: string;
@@ -29,28 +32,64 @@ type Camera = {
 };
 
 /* ── Shared in-memory state ─────────────────────────── */
+
+const defaultSongs: Song[] = [
+  {
+    id: "song-001", title: "Abide in the Light", artist: "ABCF Worship",
+    key: "C", tempo: 78, currentSection: "Verse 1", favorite: true,
+    slides: [
+      { id: "slide-001", section: "Verse 1", text: "Abide in the light, we will sing tonight." },
+      { id: "slide-002", section: "Chorus", text: "Let every heart proclaim Your name." },
+      { id: "slide-003", section: "Bridge", text: "Spirit move and stir our praise." },
+    ],
+  },
+  {
+    id: "song-002", title: "Grace Like Rain", artist: "ABCF Worship",
+    key: "G", tempo: 92, currentSection: "Chorus", favorite: false,
+    slides: [
+      { id: "slide-004", section: "Verse 1", text: "Falling like rain, Your love comes down." },
+      { id: "slide-005", section: "Chorus", text: "Grace like rain, Holy Fire." },
+      { id: "slide-006", section: "Tag", text: "We stand in awe of who You are." },
+    ],
+  },
+];
+
+/* ── Persistent song file on disk ───────────────────── */
+const CLOUD_SONGS_PATH = path.join(__dirname, "cloud_songs.json");
+
+type CloudData = {
+  songs: Song[];
+  uploadedAt: number;
+};
+
+function loadCloudSongs(): CloudData {
+  try {
+    if (fs.existsSync(CLOUD_SONGS_PATH)) {
+      const raw = fs.readFileSync(CLOUD_SONGS_PATH, "utf-8");
+      const parsed = JSON.parse(raw) as CloudData;
+      if (Array.isArray(parsed.songs)) return parsed;
+    }
+  } catch (err) {
+    console.error("[Cloud] Failed to read cloud_songs.json:", err);
+  }
+  return { songs: [], uploadedAt: 0 };
+}
+
+function saveCloudSongs(data: CloudData) {
+  try {
+    fs.writeFileSync(CLOUD_SONGS_PATH, JSON.stringify(data, null, 2), "utf-8");
+  } catch (err) {
+    console.error("[Cloud] Failed to write cloud_songs.json:", err);
+  }
+}
+
+// Initialize songs from cloud file if it exists, otherwise use defaults
+const initialCloudData = loadCloudSongs();
+const initialSongs = initialCloudData.songs.length > 0 ? initialCloudData.songs : defaultSongs;
+
 const state = {
-  songs: [
-    {
-      id: "song-001", title: "Abide in the Light", artist: "ABCF Worship",
-      key: "C", tempo: 78, currentSection: "Verse 1", favorite: true,
-      slides: [
-        { id: "slide-001", section: "Verse 1", text: "Abide in the light, we will sing tonight." },
-        { id: "slide-002", section: "Chorus", text: "Let every heart proclaim Your name." },
-        { id: "slide-003", section: "Bridge", text: "Spirit move and stir our praise." },
-      ],
-    },
-    {
-      id: "song-002", title: "Grace Like Rain", artist: "ABCF Worship",
-      key: "G", tempo: 92, currentSection: "Chorus", favorite: false,
-      slides: [
-        { id: "slide-004", section: "Verse 1", text: "Falling like rain, Your love comes down." },
-        { id: "slide-005", section: "Chorus", text: "Grace like rain, Holy Fire." },
-        { id: "slide-006", section: "Tag", text: "We stand in awe of who You are." },
-      ],
-    },
-  ] as Song[],
-  currentSongId: "song-001",
+  songs: initialSongs as Song[],
+  currentSongId: initialSongs[0]?.id || "song-001",
   currentSlide: 0,
   currentScene: "worship" as SceneMode,
   cameras: [
@@ -74,12 +113,78 @@ const io = new Server(server, {
   },
 });
 
+app.use(express.json({ limit: "5mb" }));
+
 app.get("/", (_req: Request, res: Response) => {
   res.json({ service: "abcfpt-socket", status: "ok", timestamp: Date.now() });
 });
 
 app.get("/status", (_req: Request, res: Response) => {
   res.json({ status: "ok", timestamp: Date.now() });
+});
+
+/* ── Cloud song sync REST API ───────────────────────── */
+
+/**
+ * POST /api/songs/upload
+ * Body: { songs: Song[], uploadedAt: number }
+ *
+ * Replaces the cloud setlist with the uploaded version.
+ * Also updates the in-memory state so all connected clients sync.
+ */
+app.post("/api/songs/upload", (req: Request, res: Response) => {
+  try {
+    const body = req.body as { songs?: Song[]; uploadedAt?: number };
+    if (!body.songs || !Array.isArray(body.songs)) {
+      res.status(400).json({ error: "songs array is required" });
+      return;
+    }
+
+    const uploadedAt = body.uploadedAt ?? Date.now();
+    const cloudData: CloudData = { songs: body.songs, uploadedAt };
+    saveCloudSongs(cloudData);
+
+    // Also update in-memory state for real-time clients
+    state.songs = body.songs;
+    io.emit("song:list", state.songs);
+
+    console.log(`[Cloud] Uploaded ${body.songs.length} song(s) at ${new Date(uploadedAt).toISOString()}`);
+    res.json({ ok: true, count: body.songs.length, uploadedAt });
+  } catch (err: any) {
+    console.error("[Cloud] Upload error:", err);
+    res.status(500).json({ error: err?.message || "Internal server error" });
+  }
+});
+
+/**
+ * GET /api/songs/download?since=<timestamp>
+ *
+ * Returns songs from the cloud setlist.
+ * If `since` param > 0, only returns songs with updatedAt >= since.
+ * If `since` is 0 or missing, returns all songs.
+ */
+app.get("/api/songs/download", (req: Request, res: Response) => {
+  try {
+    const since = Number(req.query.since) || 0;
+    const cloudData = loadCloudSongs();
+
+    let songsToReturn: Song[];
+    if (since > 0) {
+      songsToReturn = cloudData.songs.filter((s) => (s.updatedAt ?? 0) >= since);
+    } else {
+      songsToReturn = cloudData.songs;
+    }
+
+    console.log(`[Cloud] Download request (since=${since}): returning ${songsToReturn.length}/${cloudData.songs.length} song(s)`);
+    res.json({
+      songs: songsToReturn,
+      totalOnServer: cloudData.songs.length,
+      serverTimestamp: cloudData.uploadedAt || Date.now(),
+    });
+  } catch (err: any) {
+    console.error("[Cloud] Download error:", err);
+    res.status(500).json({ error: err?.message || "Internal server error" });
+  }
 });
 
 io.on("connection", (socket: Socket) => {

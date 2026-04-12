@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   title: "ABCF Production Team",
   description: "Unified church production platform for livestream, lyrics, and teleprompter coordination.",
   applicationName: "ABCF Production Team",
-  manifest: "/manifest.json",
+  manifest: `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/manifest.json`,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

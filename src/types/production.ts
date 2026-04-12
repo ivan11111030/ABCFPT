@@ -4,6 +4,7 @@ export type Slide = {
   id: string;
   section: string;
   text: string;
+  notes?: string;
   background?: string;
 };
 
@@ -16,6 +17,7 @@ export type Song = {
   currentSection: string;
   slides: Slide[];
   favorite: boolean;
+  updatedAt?: number;
 };
 
 export type AudioState = {

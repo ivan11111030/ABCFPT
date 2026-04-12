@@ -2,6 +2,7 @@
 
 import { useRef, useState, type DragEvent } from "react";
 import type { Song, Slide } from "@/src/types/production";
+import * as songStore from "@/src/lib/songStore";
 
 type SongManagementPanelProps = {
   songs: Song[];
@@ -31,7 +32,27 @@ export function SongManagementPanel({ songs, onImportSong, onAddSong, onUpdateSo
   const [showAddForm, setShowAddForm] = useState(false);
   const [newSong, setNewSong] = useState<Song>(emptySong());
   const [searchQuery, setSearchQuery] = useState("");
+  const [cloudStatus, setCloudStatus] = useState("");
+  const [cloudBusy, setCloudBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleUploadToCloud = async () => {
+    setCloudBusy(true);
+    setCloudStatus("");
+    const result = await songStore.uploadToCloud();
+    setCloudStatus(result.ok ? `☁️ ${result.message}` : `⚠️ ${result.message}`);
+    setCloudBusy(false);
+    setTimeout(() => setCloudStatus(""), 6000);
+  };
+
+  const handleDownloadFromCloud = async () => {
+    setCloudBusy(true);
+    setCloudStatus("");
+    const result = await songStore.downloadFromCloud(true);
+    setCloudStatus(result.ok ? `☁️ ${result.message}` : `⚠️ ${result.message}`);
+    setCloudBusy(false);
+    setTimeout(() => setCloudStatus(""), 6000);
+  };
 
   const handleFileSelect = (files: FileList | null) => {
     if (!files) return;
@@ -126,17 +147,26 @@ export function SongManagementPanel({ songs, onImportSong, onAddSong, onUpdateSo
 
       <h4 style={{ margin: "12px 0 8px", fontSize: 14 }}>Slides ({song.slides.length})</h4>
       {song.slides.map((slide, i) => (
-        <div key={slide.id} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "flex-start" }}>
-          <span style={{ minWidth: 24, textAlign: "center", paddingTop: 8, color: "var(--muted)", fontSize: 12 }}>{i + 1}</span>
-          <select value={slide.section} onChange={(e) => handleUpdateSlide(song, setSong, i, "section", e.target.value)}
-            style={{ width: 120, padding: "8px 6px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", color: "var(--text)", fontSize: 12 }}>
-            {["Verse 1", "Verse 2", "Verse 3", "Chorus", "Pre-Chorus", "Bridge", "Tag", "Outro", "Intro"].map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <textarea value={slide.text} onChange={(e) => handleUpdateSlide(song, setSong, i, "text", e.target.value)}
-            placeholder="Slide lyrics..." rows={2}
-            style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", color: "var(--text)", fontSize: 13, resize: "vertical" }} />
-          <button type="button" onClick={() => handleRemoveSlide(song, setSong, i)} disabled={song.slides.length <= 1}
-            style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "transparent", color: "var(--danger)", cursor: "pointer", fontSize: 14 }}>✕</button>
+        <div key={slide.id} style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 10, padding: "8px", background: "var(--card)", borderRadius: 8, border: "1px solid var(--border)" }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+            <span style={{ minWidth: 24, textAlign: "center", paddingTop: 8, color: "var(--muted)", fontSize: 12 }}>{i + 1}</span>
+            <select value={slide.section} onChange={(e) => handleUpdateSlide(song, setSong, i, "section", e.target.value)}
+              style={{ width: 120, padding: "8px 6px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", color: "var(--text)", fontSize: 12 }}>
+              {[slide.section, "Verse 1", "Verse 2", "Verse 3", "Chorus", "Pre-Chorus", "Bridge", "Tag", "Outro", "Intro"]
+                .filter((s, idx, arr) => arr.indexOf(s) === idx)
+                .map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <textarea value={slide.text} onChange={(e) => handleUpdateSlide(song, setSong, i, "text", e.target.value)}
+              placeholder="Slide lyrics..." rows={2}
+              style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", color: "var(--text)", fontSize: 13, resize: "vertical" }} />
+            <button type="button" onClick={() => handleRemoveSlide(song, setSong, i)} disabled={song.slides.length <= 1}
+              style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "transparent", color: "var(--danger)", cursor: "pointer", fontSize: 14 }}>✕</button>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginLeft: 32 }}>
+            <textarea value={slide.notes ?? ""} onChange={(e) => handleUpdateSlide(song, setSong, i, "notes", e.target.value)}
+              placeholder="Speaker notes (optional)..." rows={1}
+              style={{ flex: 1, padding: "6px 10px", borderRadius: 8, border: "1px dashed var(--border)", background: "transparent", color: "var(--muted)", fontSize: 12, resize: "vertical", fontStyle: "italic" }} />
+          </div>
         </div>
       ))}
       <button type="button" className="button subtle" onClick={() => handleAddSlide(song, setSong)} style={{ width: "100%", marginBottom: 12 }}>
@@ -163,6 +193,25 @@ export function SongManagementPanel({ songs, onImportSong, onAddSong, onUpdateSo
           </button>
         </div>
       </div>
+
+      {/* Cloud Sync Bar */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--border)", marginBottom: 8 }}>
+        <span style={{ fontSize: 12, color: "var(--muted)", marginRight: "auto" }}>☁️ Cloud Sync</span>
+        <button type="button" className="button outline" disabled={cloudBusy} onClick={handleUploadToCloud}
+          style={{ padding: "5px 12px", fontSize: 12 }}>
+          {cloudBusy ? "…" : "⬆ Upload to Cloud"}
+        </button>
+        <button type="button" className="button outline" disabled={cloudBusy} onClick={handleDownloadFromCloud}
+          style={{ padding: "5px 12px", fontSize: 12 }}>
+          {cloudBusy ? "…" : "⬇ Download from Cloud"}
+        </button>
+      </div>
+      {cloudStatus && (
+        <div style={{ padding: "8px 12px", borderRadius: 8, marginBottom: 8, fontSize: 13,
+          background: cloudStatus.startsWith("⚠️") ? "var(--danger)" : "var(--success)", color: "#fff" }}>
+          {cloudStatus}
+        </div>
+      )}
 
       <div
         className={`drop-zone ${dragging ? "drag-over" : ""}`}
