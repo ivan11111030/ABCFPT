@@ -20,6 +20,7 @@ import { SongManagementPanel } from "@/src/components/SongManagementPanel";
 import { DraggableOverlay, LAYOUT_PRESETS, type OverlayLayout, type OverlayPosition } from "@/src/components/DraggableOverlay";
 import { getIceServers } from "@/src/lib/realtimeConfig";
 import { createSocketClient } from "@/src/lib/socket";
+import * as camStore from "@/src/lib/cameraStreamStore";
 import { sampleCameras, sampleSongs } from "@/src/lib/fakeData";
 import { parseFile } from "@/src/lib/songParser";
 import type { Camera, CameraTransition, SceneMode, Song } from "@/src/types/production";
@@ -55,16 +56,15 @@ export default function ControlPage() {
   const [leftWidth, setLeftWidth] = useState(280);
   const [rightWidth, setRightWidth] = useState(320);
   const [showRightPanel, setShowRightPanel] = useState(true);
-  const [localStreams, setLocalStreams] = useState<Record<string, MediaStream>>({});
-  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
-  const [snapshotFrames, setSnapshotFrames] = useState<Record<string, string>>({});
+  const [localStreams, setLocalStreams] = useState<Record<string, MediaStream>>(camStore.getLocalStreams);
+  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>(camStore.getRemoteStreams);
+  const [snapshotFrames, setSnapshotFrames] = useState<Record<string, string>>(camStore.getSnapshotFrames);
   const [overlayEnabled, setOverlayEnabled] = useState(true);
   const [overlayLayout, setOverlayLayout] = useState<OverlayLayout>("lower-third");
   const [overlayPos, setOverlayPos] = useState<OverlayPosition>(LAYOUT_PRESETS["lower-third"]);
   const draggingRef = useRef<"left" | "right" | null>(null);
   const startXRef = useRef(0);
   const startWidthRef = useRef(0);
-  const peerConnectionsRef = useRef<Record<string, RTCPeerConnection>>({});
   const programVideoRef = useRef<HTMLVideoElement>(null);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
 
@@ -141,14 +141,14 @@ export default function ControlPage() {
 
       if (!cameraId || !description?.type) return;
 
-      let pc = peerConnectionsRef.current[cameraId];
+      let pc = camStore.getPeerConnections()[cameraId];
       if (!pc) {
         pc = new RTCPeerConnection({ iceServers });
 
         pc.ontrack = (event) => {
           const [stream] = event.streams;
           if (!stream) return;
-          setRemoteStreams((prev) => ({ ...prev, [cameraId]: stream }));
+          camStore.setRemoteStream(cameraId, stream);
         };
 
         pc.onicecandidate = (event) => {
@@ -159,7 +159,7 @@ export default function ControlPage() {
           });
         };
 
-        peerConnectionsRef.current[cameraId] = pc;
+        camStore.setPeerConnection(cameraId, pc);
       }
 
       await pc.setRemoteDescription(new RTCSessionDescription(description));
@@ -178,7 +178,7 @@ export default function ControlPage() {
 
       if (!cameraId || !candidate?.candidate) return;
 
-      const pc = peerConnectionsRef.current[cameraId];
+      const pc = camStore.getPeerConnections()[cameraId];
       if (!pc) return;
 
       await pc.addIceCandidate(new RTCIceCandidate(candidate));
@@ -187,12 +187,20 @@ export default function ControlPage() {
     // Snapshot fallback: receive frames relayed through the socket server
     socket.on("mobile-camera:snapshot", (payload: { cameraId: string; frame: string }) => {
       if (payload?.cameraId && payload?.frame) {
-        setSnapshotFrames((prev) => ({ ...prev, [payload.cameraId]: payload.frame }));
+        camStore.setSnapshotFrame(payload.cameraId, payload.frame);
       }
+    });
+
+    // Sync global store changes back into local React state so the UI re-renders
+    const unsubscribeStore = camStore.subscribe(() => {
+      setLocalStreams(camStore.getLocalStreams());
+      setRemoteStreams(camStore.getRemoteStreams());
+      setSnapshotFrames(camStore.getSnapshotFrames());
     });
 
     return () => {
       unsubscribeAuth();
+      unsubscribeStore();
       socket.off("connect");
       socket.off("disconnect");
       socket.off("state:sync");
@@ -297,7 +305,7 @@ export default function ControlPage() {
   const handleAddCamera = (camera: Camera, stream?: MediaStream) => {
     setCameras((prev) => (prev.some((item) => item.id === camera.id) ? prev : [...prev, camera]));
     if (stream) {
-      setLocalStreams((prev) => ({ ...prev, [camera.id]: stream }));
+      camStore.setLocalStream(camera.id, stream);
     }
   };
 
@@ -314,27 +322,10 @@ export default function ControlPage() {
       return next;
     });
 
-    setLocalStreams((prev) => {
-      const next = { ...prev };
-      const stream = next[cameraId];
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-      }
-      delete next[cameraId];
-      return next;
-    });
-
-    setRemoteStreams((prev) => {
-      const next = { ...prev };
-      delete next[cameraId];
-      return next;
-    });
-
-    const pc = peerConnectionsRef.current[cameraId];
-    if (pc) {
-      pc.close();
-      delete peerConnectionsRef.current[cameraId];
-    }
+    camStore.removeLocalStream(cameraId);
+    camStore.removeRemoteStream(cameraId);
+    camStore.removeSnapshotFrame(cameraId);
+    camStore.removePeerConnection(cameraId);
   };
 
   const streamByCamera = useMemo(() => ({ ...remoteStreams, ...localStreams }), [localStreams, remoteStreams]);
@@ -352,12 +343,6 @@ export default function ControlPage() {
       previewVideoRef.current.srcObject = stream ?? null;
     }
   }, [previewCameraId, streamByCamera]);
-
-  useEffect(() => {
-    return () => {
-      Object.values(localStreams).forEach((stream) => stream.getTracks().forEach((track) => track.stop()));
-    };
-  }, [localStreams]);
 
   const startStream = () => {
     if (!streamKey.trim()) {

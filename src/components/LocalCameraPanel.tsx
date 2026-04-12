@@ -86,10 +86,17 @@ export function LocalCameraPanel({ onAddCamera }: LocalCameraPanelProps) {
       signalStrength: "good",
     };
     onAddCamera(camera, streamRef.current ?? undefined);
+    // Stream ownership transferred to the global store — don't stop it locally
+    streamRef.current = null;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setPreviewing(false);
   };
 
   useEffect(() => {
     return () => {
+      // Only stop the stream if it hasn't been transferred (i.e. user didn't add it)
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
