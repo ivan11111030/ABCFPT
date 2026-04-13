@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   createUserWithEmailAndPassword,
+  getRedirectResult,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
-  signInWithPopup,
+  signInWithRedirect,
   GoogleAuthProvider,
   signOut,
 } from "firebase/auth";
@@ -32,6 +33,26 @@ export default function AuthPage() {
     }
   }, [user, router]);
 
+  useEffect(() => {
+    let active = true;
+
+    const readRedirectResult = async () => {
+      try {
+        await getRedirectResult(auth);
+      } catch (error: unknown) {
+        if (active) {
+          setMessage((error as Error).message || "Google sign-in failed.");
+        }
+      }
+    };
+
+    void readRedirectResult();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const handleAuth = async () => {
     setLoading(true);
     setMessage("");
@@ -55,12 +76,11 @@ export default function AuthPage() {
 
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      await signInWithRedirect(auth, provider);
     } catch (error: unknown) {
       setMessage((error as Error).message || "Google sign-in failed.");
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const handleResetPassword = async () => {

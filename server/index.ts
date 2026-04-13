@@ -115,6 +115,29 @@ const io = new Server(server, {
   },
 });
 
+app.use((req: Request, res: Response, next) => {
+  const requestOrigin = req.headers.origin;
+  const allowAllOrigins = corsOrigins.length === 1 && corsOrigins[0] === "*";
+
+  if (allowAllOrigins) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+  } else if (requestOrigin && corsOrigins.includes(requestOrigin)) {
+    // Reflect allowed origins so browser preflight succeeds for configured clients.
+    res.setHeader("Access-Control-Allow-Origin", requestOrigin);
+    res.setHeader("Vary", "Origin");
+  }
+
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  if (req.method === "OPTIONS") {
+    res.status(204).end();
+    return;
+  }
+
+  next();
+});
+
 app.use(express.json({ limit: "5mb" }));
 
 app.get("/", (_req: Request, res: Response) => {
