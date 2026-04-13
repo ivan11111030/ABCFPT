@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   createUserWithEmailAndPassword,
-  getRedirectResult,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signInWithRedirect,
   GoogleAuthProvider,
   signOut,
@@ -33,26 +33,6 @@ export default function AuthPage() {
     }
   }, [user, router]);
 
-  useEffect(() => {
-    let active = true;
-
-    const readRedirectResult = async () => {
-      try {
-        await getRedirectResult(auth);
-      } catch (error: unknown) {
-        if (active) {
-          setMessage((error as Error).message || "Google sign-in failed.");
-        }
-      }
-    };
-
-    void readRedirectResult();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
   const handleAuth = async () => {
     setLoading(true);
     setMessage("");
@@ -76,11 +56,26 @@ export default function AuthPage() {
 
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithRedirect(auth, provider);
+      await signInWithPopup(auth, provider);
     } catch (error: unknown) {
-      setMessage((error as Error).message || "Google sign-in failed.");
+      const firebaseError = error as { code?: string; message?: string };
+      if (firebaseError.code === "auth/popup-blocked" || firebaseError.code === "auth/popup-closed-by-user") {
+        try {
+          const provider = new GoogleAuthProvider();
+          await signInWithRedirect(auth, provider);
+          return;
+        } catch (redirectError: unknown) {
+          setMessage((redirectError as Error).message || "Google sign-in failed.");
+          setLoading(false);
+          return;
+        }
+      }
+
+      setMessage(firebaseError.message || "Google sign-in failed.");
       setLoading(false);
     }
+
+    setLoading(false);
   };
 
   const handleResetPassword = async () => {
