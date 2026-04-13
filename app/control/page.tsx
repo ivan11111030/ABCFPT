@@ -35,7 +35,6 @@ import { DEFAULT_SCENE_CONFIGS } from "@/src/types/scene";
 
 const socket = createSocketClient();
 const iceServers = getIceServers();
-const BASE = process.env.NEXT_PUBLIC_BASE_PATH || "/ABCFPT";
 
 type SignalingPayload = {
   cameraId?: string;
@@ -87,11 +86,6 @@ export default function ControlPage() {
   const previewVideoRef = useRef<HTMLVideoElement>(null);
 
   const router = useRouter();
-
-  const openDisplayScreen = useCallback((path: "/projector" | "/teleprompter") => {
-    const target = path === "/projector" ? "abcfpt-projector" : "abcfpt-teleprompter";
-    window.open(`${BASE}${path}`, target, "noopener,noreferrer");
-  }, []);
 
   const reconnectDisplays = useCallback(() => {
     // Emit current state to all connected display clients (projector/teleprompter)
@@ -777,17 +771,17 @@ export default function ControlPage() {
               </span>
             </div>
             <p className="display-connect-copy">
-              Sync the latest state to projector and teleprompter, or open a new window if closed.
+              Sync the latest control state to all connected displays.
             </p>
             <div className="display-connect-actions">
               <button type="button" className="button primary" onClick={reconnectDisplays}>
                 Reconnect Displays
               </button>
-              <button type="button" className="button outline" onClick={() => openDisplayScreen("/projector")}>
-                Open Projector
+              <button type="button" className="button outline" onClick={reconnectDisplays}>
+                Sync Projector
               </button>
-              <button type="button" className="button outline" onClick={() => openDisplayScreen("/teleprompter")}>
-                Open Teleprompter
+              <button type="button" className="button outline" onClick={reconnectDisplays}>
+                Sync Teleprompter
               </button>
             </div>
           </section>
