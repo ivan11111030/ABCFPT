@@ -35,6 +35,7 @@ import { DEFAULT_SCENE_CONFIGS } from "@/src/types/scene";
 
 const socket = createSocketClient();
 const iceServers = getIceServers();
+const BASE = process.env.NEXT_PUBLIC_BASE_PATH || "/ABCFPT";
 
 type SignalingPayload = {
   cameraId?: string;
@@ -86,6 +87,16 @@ export default function ControlPage() {
   const previewVideoRef = useRef<HTMLVideoElement>(null);
 
   const router = useRouter();
+
+  const openDisplayScreen = useCallback((path: "/projector" | "/teleprompter") => {
+    const target = path === "/projector" ? "abcfpt-projector" : "abcfpt-teleprompter";
+    window.open(`${BASE}${path}`, target, "noopener,noreferrer");
+  }, []);
+
+  const openAllDisplayScreens = useCallback(() => {
+    openDisplayScreen("/projector");
+    openDisplayScreen("/teleprompter");
+  }, [openDisplayScreen]);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -743,6 +754,28 @@ export default function ControlPage() {
           <CameraDiscoveryPanel onAddCamera={handleAddCamera} />
           <LocalCameraPanel onAddCamera={handleAddCamera} />
           <MobileCameraInvitePanel />
+          <section className="display-connect-panel">
+            <div className="panel-header">
+              <p>Display Connections</p>
+              <span className={`status-pill ${connected ? "active" : "offline"}`}>
+                {connected ? "Ready" : "Server Offline"}
+              </span>
+            </div>
+            <p className="display-connect-copy">
+              Reopen the projector or teleprompter screens when an operator window is closed or loses connection.
+            </p>
+            <div className="display-connect-actions">
+              <button type="button" className="button primary" onClick={openAllDisplayScreens}>
+                Open Both Screens
+              </button>
+              <button type="button" className="button outline" onClick={() => openDisplayScreen("/projector")}>
+                Open Projector
+              </button>
+              <button type="button" className="button outline" onClick={() => openDisplayScreen("/teleprompter")}>
+                Open Teleprompter
+              </button>
+            </div>
+          </section>
           <SyncStatusBadge status={connected ? "connected" : "disconnected"} />
         </div>
         )}

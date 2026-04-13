@@ -906,6 +906,36 @@ h1, h2, h3, p { margin: 0; }
 .badge.pending { background: rgba(79, 195, 247, 0.14); color: #bfdbfe; }
 .badge.offline { background: rgba(239, 68, 68, 0.14); color: #fecaca; }
 
+.display-connect-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: var(--sp-2);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.display-connect-copy {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.display-connect-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.display-connect-actions .button:first-child {
+  grid-column: 1 / -1;
+}
+
+.display-connect-actions .button {
+  width: 100%;
+}
+
 /* ========== LIVESTREAM STUDIO ========== */
 .studio-panel {
   background: var(--panel);
