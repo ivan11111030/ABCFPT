@@ -3,7 +3,7 @@ services:
     name: abcfpt-socket
     runtime: node
     plan: free
-    buildCommand: npm install
+    buildCommand: apt-get update && apt-get install -y --no-install-recommends ffmpeg && npm install
     startCommand: npm run server:start
     healthCheckPath: /status
     envVars:

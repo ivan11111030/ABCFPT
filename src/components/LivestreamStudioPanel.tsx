@@ -81,8 +81,8 @@ export function LivestreamStudioPanel({
           borderRadius: 8,
           marginBottom: 8,
           fontSize: 13,
-          background: streamStatus.toLowerCase().includes("error") ? "var(--danger)" : streamStatus === "Live" ? "var(--success)" : "var(--card)",
-          color: streamStatus.toLowerCase().includes("error") || streamStatus === "Live" ? "#fff" : "var(--text)",
+          background: streamStatus.toLowerCase().includes("error") ? "var(--danger)" : streamStatus === "Live" ? "var(--success)" : streamStatus === "Connecting..." ? "#f59e0b" : "var(--card)",
+          color: streamStatus.toLowerCase().includes("error") || streamStatus === "Live" || streamStatus === "Connecting..." ? "#fff" : "var(--text)",
         }}>
           {streamStatus}
         </div>

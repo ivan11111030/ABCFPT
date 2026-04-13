@@ -84,6 +84,9 @@ export default function ControlPage() {
   const startWidthRef = useRef(0);
   const programVideoRef = useRef<HTMLVideoElement>(null);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
+  const streamCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const animFrameRef = useRef<number>(0);
 
   const router = useRouter();
 
@@ -142,8 +145,32 @@ export default function ControlPage() {
     socket.on("camera:list", (cameraList: Camera[]) => setCameras(cameraList));
     socket.on("song:list", (songList: Song[]) => songStore.setSongs(songList));
     socket.on("stream:started", () => { setIsLive(true); setStreamStatus("Live"); });
-    socket.on("stream:stopped", () => { setIsLive(false); setStreamStatus("Stopped"); });
-    socket.on("stream:error", (err: { message: string }) => { setStreamStatus(err.message); setIsLive(false); });
+    socket.on("stream:stopped", () => {
+      setIsLive(false);
+      setStreamStatus("Stopped");
+      // Clean up client-side recording
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+        mediaRecorderRef.current = null;
+      }
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = 0;
+      }
+    });
+    socket.on("stream:error", (err: { message: string }) => {
+      setStreamStatus(`Error: ${err.message}`);
+      setIsLive(false);
+      // Clean up client-side recording on server error
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+        mediaRecorderRef.current = null;
+      }
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = 0;
+      }
+    });
     socket.on("control:standby", (enabled: boolean) => setStandby(enabled));
     socket.on("control:background", (bg: { type: "color" | "image"; value: string }) => setBackground(bg));
     socket.on("stream:overlayToggled", (payload: { enabled: boolean }) => setOverlayEnabled(payload.enabled));
@@ -452,10 +479,156 @@ export default function ControlPage() {
       return;
     }
     setStreamStatus("Connecting...");
+
+    // Tell server to start ffmpeg process first
     socket.emit("stream:start", { rtmpUrl, streamKey, scene: activeScene, cameraId: activeCameraId });
+
+    // Build a canvas that composites the program video + overlays
+    const WIDTH = 1280;
+    const HEIGHT = 720;
+
+    let canvas = streamCanvasRef.current;
+    if (!canvas) {
+      canvas = document.createElement("canvas");
+      canvas.width = WIDTH;
+      canvas.height = HEIGHT;
+      streamCanvasRef.current = canvas;
+    }
+    const ctx = canvas.getContext("2d")!;
+
+    // Get the camera source video element
+    const srcVideo = programVideoRef.current;
+
+    // Draw composited frame
+    const drawFrame = () => {
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+      // Draw the camera video
+      if (srcVideo && srcVideo.readyState >= 2) {
+        const vw = srcVideo.videoWidth || WIDTH;
+        const vh = srcVideo.videoHeight || HEIGHT;
+        const scale = Math.min(WIDTH / vw, HEIGHT / vh);
+        const dw = vw * scale;
+        const dh = vh * scale;
+        const dx = (WIDTH - dw) / 2;
+        const dy = (HEIGHT - dh) / 2;
+        ctx.drawImage(srcVideo, dx, dy, dw, dh);
+      }
+
+      // Draw lyrics overlay if enabled
+      if (overlayEnabled && activeSong?.slides?.[currentSlide]?.text) {
+        const text = activeSong.slides[currentSlide].text;
+        const section = activeSong.slides[currentSlide].section || "";
+
+        // Use overlay position to determine where to draw
+        const ox = (overlayPos.x / 100) * WIDTH;
+        const oy = (overlayPos.y / 100) * HEIGHT;
+        const ow = (overlayPos.width / 100) * WIDTH;
+        const oh = (overlayHeight / 100) * HEIGHT;
+
+        // Semi-transparent background
+        ctx.fillStyle = `rgba(0, 0, 0, ${(overlayOpacity / 100) * 0.7})`;
+        ctx.fillRect(ox, oy, ow, oh);
+
+        // Lyrics text
+        ctx.fillStyle = `rgba(255, 255, 255, ${overlayOpacity / 100})`;
+        ctx.font = "bold 28px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        // Word-wrap text
+        const maxWidth = ow - 40;
+        const words = text.split(" ");
+        const lines: string[] = [];
+        let currentLine = "";
+        for (const word of words) {
+          const testLine = currentLine ? `${currentLine} ${word}` : word;
+          if (ctx.measureText(testLine).width > maxWidth && currentLine) {
+            lines.push(currentLine);
+            currentLine = word;
+          } else {
+            currentLine = testLine;
+          }
+        }
+        if (currentLine) lines.push(currentLine);
+
+        const lineHeight = 34;
+        const totalTextHeight = lines.length * lineHeight + (section ? 24 : 0);
+        let textY = oy + (oh - totalTextHeight) / 2 + lineHeight / 2;
+
+        for (const line of lines) {
+          ctx.fillText(line, ox + ow / 2, textY);
+          textY += lineHeight;
+        }
+
+        // Section label
+        if (section) {
+          ctx.font = "16px sans-serif";
+          ctx.fillStyle = `rgba(200, 200, 200, ${overlayOpacity / 100})`;
+          ctx.fillText(section, ox + ow / 2, textY + 8);
+        }
+      }
+
+      animFrameRef.current = requestAnimationFrame(drawFrame);
+    };
+    drawFrame();
+
+    // Capture the canvas as a media stream
+    const canvasStream = canvas.captureStream(30);
+
+    // Add audio from the active camera if available
+    const cameraStream = streamByCamera[activeCameraId];
+    if (cameraStream) {
+      const audioTracks = cameraStream.getAudioTracks();
+      for (const track of audioTracks) {
+        canvasStream.addTrack(track);
+      }
+    }
+
+    // Record and send chunks to server
+    const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+      ? "video/webm;codecs=vp8,opus"
+      : MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
+        ? "video/webm;codecs=vp8"
+        : "video/webm";
+
+    const recorder = new MediaRecorder(canvasStream, {
+      mimeType,
+      videoBitsPerSecond: 2_500_000,
+    });
+
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        event.data.arrayBuffer().then((buf) => {
+          socket.emit("stream:data", buf);
+        });
+      }
+    };
+
+    recorder.onerror = () => {
+      setStreamStatus("Error: Recording failed");
+      stopStream();
+    };
+
+    // Send a chunk every 250ms for low latency
+    recorder.start(250);
+    mediaRecorderRef.current = recorder;
   };
 
   const stopStream = () => {
+    // Stop the MediaRecorder
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current = null;
+    }
+
+    // Stop the canvas animation loop
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = 0;
+    }
+
     socket.emit("stream:stop", { scene: activeScene, cameraId: activeCameraId });
     setStreamStatus("");
   };

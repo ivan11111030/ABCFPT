@@ -2,6 +2,7 @@ import express, { type Request, type Response } from "express";
 import http from "http";
 import fs from "fs";
 import path from "path";
+import { spawn, type ChildProcess } from "child_process";
 import { Server, type Socket } from "socket.io";
 
 const app = express();
@@ -107,12 +108,101 @@ const state = {
   sceneConfig: null as any,
 };
 
+/* ── FFmpeg RTMP streaming ──────────────────────────── */
+let ffmpegProcess: ChildProcess | null = null;
+let streamTargetUrl: string = "";
+
+function stopFfmpeg() {
+  if (ffmpegProcess) {
+    try {
+      ffmpegProcess.stdin?.end();
+      ffmpegProcess.kill("SIGTERM");
+    } catch { /* already dead */ }
+    ffmpegProcess = null;
+  }
+  streamTargetUrl = "";
+}
+
+function startFfmpeg(rtmpUrl: string, streamKey: string): { ok: boolean; error?: string } {
+  stopFfmpeg(); // clean up previous
+
+  const fullUrl = `${rtmpUrl}${streamKey}`;
+  streamTargetUrl = fullUrl;
+
+  // Validate URL format
+  if (!fullUrl.startsWith("rtmp://") && !fullUrl.startsWith("rtmps://")) {
+    return { ok: false, error: "Invalid RTMP URL — must start with rtmp:// or rtmps://" };
+  }
+
+  try {
+    const args = [
+      "-f", "webm",           // input format from MediaRecorder
+      "-i", "pipe:0",         // read from stdin
+      // Video encoding
+      "-c:v", "libx264",
+      "-preset", "veryfast",
+      "-tune", "zerolatency",
+      "-b:v", "2500k",
+      "-maxrate", "2500k",
+      "-bufsize", "5000k",
+      "-pix_fmt", "yuv420p",
+      "-g", "60",             // keyframe every 2s at 30fps
+      "-r", "30",
+      // Audio encoding
+      "-c:a", "aac",
+      "-b:a", "128k",
+      "-ar", "44100",
+      // Output
+      "-f", "flv",
+      "-flvflags", "no_duration_filesize",
+      fullUrl,
+    ];
+
+    ffmpegProcess = spawn("ffmpeg", args, { stdio: ["pipe", "pipe", "pipe"] });
+
+    ffmpegProcess.stderr?.on("data", (data: Buffer) => {
+      const msg = data.toString();
+      // Only log meaningful lines (skip progress spam)
+      if (msg.includes("Error") || msg.includes("error") || msg.includes("failed") || msg.includes("Opening") || msg.includes("Output")) {
+        console.log(`[FFmpeg] ${msg.trim()}`);
+      }
+    });
+
+    ffmpegProcess.on("error", (err) => {
+      console.error("[FFmpeg] Process error:", err.message);
+      state.isLive = false;
+      io.emit("stream:error", { message: `FFmpeg error: ${err.message}` });
+      io.emit("stream:stopped", { status: "stopped" });
+      ffmpegProcess = null;
+    });
+
+    ffmpegProcess.on("close", (code) => {
+      console.log(`[FFmpeg] Process exited with code ${code}`);
+      if (state.isLive) {
+        state.isLive = false;
+        if (code !== 0) {
+          io.emit("stream:error", { message: `Stream ended unexpectedly (code ${code})` });
+        }
+        io.emit("stream:stopped", { status: "stopped" });
+      }
+      ffmpegProcess = null;
+    });
+
+    console.log(`[FFmpeg] Started → ${fullUrl}`);
+    return { ok: true };
+  } catch (err: any) {
+    console.error("[FFmpeg] Failed to spawn:", err);
+    return { ok: false, error: err.message || "Failed to start ffmpeg" };
+  }
+}
+
 /* ── Socket.io ──────────────────────────────────────── */
 const io = new Server(server, {
   cors: {
     origin: corsOrigins.length === 1 && corsOrigins[0] === "*" ? "*" : corsOrigins,
     methods: ["GET", "POST"],
   },
+  maxHttpBufferSize: 5e6, // 5MB for video chunks
 });
 
 app.use((req: Request, res: Response, next) => {
@@ -372,13 +462,31 @@ io.on("connection", (socket: Socket) => {
       socket.emit("stream:error", { message: "RTMP URL and Stream Key are required." });
       return;
     }
+
+    const result = startFfmpeg(payload.rtmpUrl, payload.streamKey);
+    if (!result.ok) {
+      socket.emit("stream:error", { message: result.error || "Failed to start stream" });
+      return;
+    }
+
     state.isLive = true;
-    const fullUrl = `${payload.rtmpUrl}${payload.streamKey}`;
-    console.log(`[Stream] RTMP target: ${fullUrl}`);
-    io.emit("stream:started", { ...payload, status: "live" });
+    console.log(`[Stream] Live → ${payload.rtmpUrl}***`);
+    io.emit("stream:started", { scene: payload.scene, cameraId: payload.cameraId, status: "live" });
+  });
+
+  // Binary video data from client MediaRecorder
+  socket.on("stream:data", (chunk: Buffer | ArrayBuffer) => {
+    if (!ffmpegProcess || !ffmpegProcess.stdin?.writable) return;
+    try {
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      ffmpegProcess.stdin.write(buf);
+    } catch (err: any) {
+      console.error("[Stream] Error writing to ffmpeg:", err.message);
+    }
   });
 
   socket.on("stream:stop", () => {
+    stopFfmpeg();
     state.isLive = false;
     console.log("[Stream] Stream stopped");
     io.emit("stream:stopped", { status: "stopped" });
@@ -442,6 +550,14 @@ io.on("connection", (socket: Socket) => {
       state.cameras = state.cameras.filter((camera) => camera.id !== mobileCameraId);
       socketCameraMap.delete(socket.id);
       io.emit("camera:list", state.cameras);
+    }
+
+    // If the disconnecting client was streaming, stop ffmpeg
+    if (state.isLive && ffmpegProcess) {
+      console.log("[Stream] Streaming client disconnected, stopping ffmpeg");
+      stopFfmpeg();
+      state.isLive = false;
+      io.emit("stream:stopped", { status: "stopped" });
     }
 
     console.log(`Socket disconnected: ${socket.id}`);
