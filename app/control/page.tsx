@@ -93,10 +93,25 @@ export default function ControlPage() {
     window.open(`${BASE}${path}`, target, "noopener,noreferrer");
   }, []);
 
-  const openAllDisplayScreens = useCallback(() => {
-    openDisplayScreen("/projector");
-    openDisplayScreen("/teleprompter");
-  }, [openDisplayScreen]);
+  const reconnectDisplays = useCallback(() => {
+    // Emit current state to all connected display clients (projector/teleprompter)
+    socket.emit("state:sync", {
+      songs: songs,
+      currentSongId: activeSongId,
+      currentSlide: currentSlide,
+      currentScene: activeScene,
+      cameras: cameras,
+      activeCameraId: activeCameraId,
+      cameraTransition: cameraTransition,
+      isLive: isLive,
+      overlayEnabled: overlayEnabled,
+      overlayPosition: overlayPos,
+      standby: standby,
+      background: background,
+      sceneType: activeSceneType,
+      sceneConfig: activeSceneConfig,
+    });
+  }, [songs, activeSongId, currentSlide, activeScene, cameras, activeCameraId, cameraTransition, isLive, overlayEnabled, overlayPos, standby, background, activeSceneType, activeSceneConfig]);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -762,11 +777,11 @@ export default function ControlPage() {
               </span>
             </div>
             <p className="display-connect-copy">
-              Reopen the projector or teleprompter screens when an operator window is closed or loses connection.
+              Sync the latest state to projector and teleprompter, or open a new window if closed.
             </p>
             <div className="display-connect-actions">
-              <button type="button" className="button primary" onClick={openAllDisplayScreens}>
-                Open Both Screens
+              <button type="button" className="button primary" onClick={reconnectDisplays}>
+                Reconnect Displays
               </button>
               <button type="button" className="button outline" onClick={() => openDisplayScreen("/projector")}>
                 Open Projector
