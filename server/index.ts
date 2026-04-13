@@ -103,6 +103,8 @@ const state = {
   overlayPosition: { x: 0, y: 75, width: 100 } as OverlayPosition,
   standby: false,
   background: { type: "color" as "color" | "image", value: "#000000" },
+  sceneType: "worship" as string,
+  sceneConfig: null as any,
 };
 
 /* ── Socket.io ──────────────────────────────────────── */
@@ -206,9 +208,13 @@ io.on("connection", (socket: Socket) => {
     io.emit("control:slide", 0);
   });
 
-  socket.on("control:scene", (payload: { scene: string; cameraId: string; transition: string } | string) => {
+  socket.on("control:scene", (payload: { scene: string; cameraId: string; transition: string; sceneType?: string; sceneConfig?: any } | string) => {
     const scene = (typeof payload === "string" ? payload : payload.scene) as SceneMode;
     state.currentScene = scene;
+    if (typeof payload !== "string") {
+      if (payload.sceneType) state.sceneType = payload.sceneType;
+      if (payload.sceneConfig) state.sceneConfig = payload.sceneConfig;
+    }
     io.emit("control:scene", typeof payload === "string" ? { scene } : payload);
   });
 
@@ -363,6 +369,21 @@ io.on("connection", (socket: Socket) => {
   socket.on("stream:overlayPosition", (pos: OverlayPosition) => {
     state.overlayPosition = pos;
     io.emit("stream:overlayPosition", pos);
+  });
+
+  socket.on("stream:overlayOpacity", (opacity: number) => {
+    (state as any).overlayOpacity = opacity;
+    io.emit("stream:overlayOpacity", opacity);
+  });
+
+  socket.on("stream:overlayHeight", (height: number) => {
+    (state as any).overlayHeight = height;
+    io.emit("stream:overlayHeight", height);
+  });
+
+  socket.on("stream:canvaOverlay", (imageUrl: string | null) => {
+    (state as any).canvaOverlayImage = imageUrl;
+    io.emit("stream:canvaOverlay", imageUrl);
   });
 
   /* ── Standby & Background ────────────────────────── */

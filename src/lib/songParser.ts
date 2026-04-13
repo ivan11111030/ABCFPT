@@ -1,4 +1,4 @@
-import type { Slide, Song } from "@/src/types/production";
+import type { Slide, Song, SlideTransition } from "@/src/types/production";
 import JSZip from "jszip";
 
 export function parseTxtFile(content: string, fileName: string): Song {
@@ -111,6 +111,39 @@ export async function parsePptxFile(file: File): Promise<Song> {
   const zip = await JSZip.loadAsync(file);
   const slides: Slide[] = [];
 
+  // ── Extract theme/master fonts for reference ──
+  const embeddedFonts: string[] = [];
+  const themeFile = zip.file("ppt/theme/theme1.xml");
+  if (themeFile) {
+    try {
+      const themeXml = await themeFile.async("text");
+      const fontRegex = /<a:latin\s+typeface="([^"]+)"/g;
+      let fontMatch: RegExpExecArray | null;
+      while ((fontMatch = fontRegex.exec(themeXml)) !== null) {
+        if (!embeddedFonts.includes(fontMatch[1])) embeddedFonts.push(fontMatch[1]);
+      }
+      const eastAsianFontRegex = /<a:ea\s+typeface="([^"]+)"/g;
+      while ((fontMatch = eastAsianFontRegex.exec(themeXml)) !== null) {
+        if (!embeddedFonts.includes(fontMatch[1])) embeddedFonts.push(fontMatch[1]);
+      }
+    } catch { /* theme unreadable */ }
+  }
+
+  // ── Extract presentation-level slide size ──
+  let slideWidth = 9144000; // default EMU (10in)
+  let slideHeight = 6858000; // default EMU (7.5in)
+  const presentationFile = zip.file("ppt/presentation.xml");
+  if (presentationFile) {
+    try {
+      const presXml = await presentationFile.async("text");
+      const sizeMatch = presXml.match(/<p:sldSz\s+cx="(\d+)"\s+cy="(\d+)"/);
+      if (sizeMatch) {
+        slideWidth = parseInt(sizeMatch[1], 10);
+        slideHeight = parseInt(sizeMatch[2], 10);
+      }
+    } catch { /* fallback to defaults */ }
+  }
+
   // PPTX slides are in ppt/slides/slide1.xml, slide2.xml, etc.
   const slideEntries: { num: number; path: string }[] = [];
   zip.forEach((relativePath) => {
@@ -127,13 +160,40 @@ export async function parsePptxFile(file: File): Promise<Song> {
     const xmlContent = await zip.file(entry.path)?.async("text");
     if (!xmlContent) continue;
 
-    // Extract all text from <a:t> tags in the slide XML
+    // ── Preserve raw XML for faithful rendering ──
+    const rawXml = xmlContent;
+
+    // ── Extract transition metadata ──
+    let transition: SlideTransition | undefined;
+    const transMatch = xmlContent.match(/<p:transition(?:\s+spd="([^"]*)")?(?:\s+advTm="(\d+)")?[^>]*>([\s\S]*?)<\/p:transition>/);
+    if (transMatch) {
+      const speed = transMatch[1] || "med";
+      const advanceAfter = transMatch[2] ? parseInt(transMatch[2], 10) : undefined;
+      // Extract transition type from child element
+      const typeMatch = transMatch[3]?.match(/<p:(\w+)/);
+      const transType = typeMatch?.[1] || "fade";
+      const durationMap: Record<string, number> = { slow: 1000, med: 500, fast: 250 };
+      transition = {
+        type: transType,
+        duration: durationMap[speed] || 500,
+        ...(advanceAfter !== undefined ? { advanceAfter } : {}),
+      };
+    }
+
+    // ── Extract all text runs preserving formatting ──
     const textParts: string[] = [];
     const textRegex = /<a:t>([\s\S]*?)<\/a:t>/g;
     let match: RegExpExecArray | null;
     while ((match = textRegex.exec(xmlContent)) !== null) {
       const text = match[1].trim();
       if (text) textParts.push(text);
+    }
+
+    // ── Extract per-slide background ──
+    let slideBackground: string | undefined;
+    const bgFillMatch = xmlContent.match(/<p:bg>[\s\S]*?<a:srgbClr\s+val="([0-9A-Fa-f]{6})"/);
+    if (bgFillMatch) {
+      slideBackground = `#${bgFillMatch[1]}`;
     }
 
     // Extract speaker notes from the corresponding notesSlide XML
@@ -160,13 +220,25 @@ export async function parsePptxFile(file: File): Promise<Song> {
       }
     }
 
+    // ── Render slide to image via canvas for faithful preview ──
+    let renderedImage: string | undefined;
+    try {
+      renderedImage = await renderSlideToImage(xmlContent, embeddedFonts, slideWidth, slideHeight);
+    } catch {
+      // rendering failed; text fallback will be used
+    }
+
     const slideText = textParts.join("\n").trim();
-    if (slideText) {
+    if (slideText || renderedImage) {
       slides.push({
         id: `slide-pptx-${Date.now()}-${slides.length}`,
         section: `Slide ${slides.length + 1}`,
-        text: slideText,
+        text: slideText || "(Visual slide – no text)",
         ...(speakerNotes ? { notes: speakerNotes } : {}),
+        ...(slideBackground ? { background: slideBackground } : {}),
+        ...(renderedImage ? { renderedImage } : {}),
+        rawXml,
+        ...(transition ? { transition } : {}),
       });
     }
   }
@@ -190,6 +262,103 @@ export async function parsePptxFile(file: File): Promise<Song> {
     slides,
     favorite: false,
   };
+}
+
+/**
+ * Render a PPTX slide XML to a base64 PNG image using an offscreen canvas.
+ * Extracts text runs with position/font info and draws them faithfully.
+ */
+async function renderSlideToImage(
+  slideXml: string,
+  themeFonts: string[],
+  slideWidthEmu: number,
+  slideHeightEmu: number,
+): Promise<string | undefined> {
+  if (typeof document === "undefined") return undefined; // SSR guard
+
+  const canvasWidth = 960;
+  const canvasHeight = Math.round(canvasWidth * (slideHeightEmu / slideWidthEmu));
+  const scaleX = canvasWidth / slideWidthEmu;
+  const scaleY = canvasHeight / slideHeightEmu;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = canvasWidth;
+  canvas.height = canvasHeight;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return undefined;
+
+  // Background
+  ctx.fillStyle = "#000000";
+  const bgMatch = slideXml.match(/<p:bg>[\s\S]*?<a:srgbClr\s+val="([0-9A-Fa-f]{6})"/);
+  if (bgMatch) ctx.fillStyle = `#${bgMatch[1]}`;
+  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+  // Extract shape positions and text
+  const shapeRegex = /<p:sp>([\s\S]*?)<\/p:sp>/g;
+  let shapeMatch: RegExpExecArray | null;
+
+  while ((shapeMatch = shapeRegex.exec(slideXml)) !== null) {
+    const shapeXml = shapeMatch[1];
+
+    // Position from <a:off> and <a:ext>
+    const offMatch = shapeXml.match(/<a:off\s+x="(\d+)"\s+y="(\d+)"/);
+    const extMatch = shapeXml.match(/<a:ext\s+cx="(\d+)"\s+cy="(\d+)"/);
+    if (!offMatch) continue;
+
+    const x = parseInt(offMatch[1], 10) * scaleX;
+    const y = parseInt(offMatch[2], 10) * scaleY;
+    const w = extMatch ? parseInt(extMatch[1], 10) * scaleX : canvasWidth;
+
+    // Extract text runs
+    const runRegex = /<a:r>([\s\S]*?)<\/a:r>/g;
+    let runMatch: RegExpExecArray | null;
+    let lineY = y + 20;
+
+    while ((runMatch = runRegex.exec(shapeXml)) !== null) {
+      const runXml = runMatch[1];
+      const textMatch = runXml.match(/<a:t>([\s\S]*?)<\/a:t>/);
+      if (!textMatch) continue;
+
+      const text = textMatch[1].trim();
+      if (!text) continue;
+
+      // Font properties
+      const sizeMatch = runXml.match(/sz="(\d+)"/);
+      const boldMatch = runXml.match(/b="1"/);
+      const italicMatch = runXml.match(/i="1"/);
+      const fontMatch = runXml.match(/<a:latin\s+typeface="([^"]+)"/);
+      const colorMatch = runXml.match(/<a:srgbClr\s+val="([0-9A-Fa-f]{6})"/);
+
+      const fontSize = sizeMatch ? parseInt(sizeMatch[1], 10) / 100 * scaleX * 10 : 16;
+      const fontFamily = fontMatch?.[1] || themeFonts[0] || "sans-serif";
+      const bold = boldMatch ? "bold " : "";
+      const italic = italicMatch ? "italic " : "";
+
+      ctx.font = `${italic}${bold}${Math.max(10, fontSize)}px "${fontFamily}", sans-serif`;
+      ctx.fillStyle = colorMatch ? `#${colorMatch[1]}` : "#ffffff";
+      ctx.textBaseline = "top";
+
+      // Word wrap within shape width
+      const words = text.split(" ");
+      let line = "";
+      for (const word of words) {
+        const test = line ? `${line} ${word}` : word;
+        if (ctx.measureText(test).width > w - 10) {
+          ctx.fillText(line, x + 5, lineY);
+          lineY += fontSize * 1.3;
+          line = word;
+        } else {
+          line = test;
+        }
+      }
+      if (line) {
+        ctx.fillText(line, x + 5, lineY);
+        lineY += fontSize * 1.3;
+      }
+    }
+  }
+
+  return canvas.toDataURL("image/png", 0.85);
 }
 
 export async function parseFile(file: File): Promise<Song | null> {

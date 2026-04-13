@@ -5,7 +5,9 @@ import Link from "next/link";
 import { createSocketClient } from "@/src/lib/socket";
 import * as songStore from "@/src/lib/songStore";
 import { DraggableOverlay, LAYOUT_PRESETS, type OverlayPosition } from "@/src/components/DraggableOverlay";
-import type { Song } from "@/src/types/production";
+import type { Song, BackgroundConfig } from "@/src/types/production";
+import type { SceneConfig, SceneType } from "@/src/types/scene";
+import { DEFAULT_SCENE_CONFIGS } from "@/src/types/scene";
 
 const socket = createSocketClient();
 
@@ -15,12 +17,18 @@ export default function ProjectorPage() {
   const [slideIndex, setSlideIndex] = useState(0);
   const [overlayEnabled, setOverlayEnabled] = useState(true);
   const [overlayPos, setOverlayPos] = useState<OverlayPosition>(LAYOUT_PRESETS["lower-third"]);
+  const [overlayOpacity, setOverlayOpacity] = useState(100);
+  const [overlayHeight, setOverlayHeight] = useState(25);
   const [hasVideoStream, setHasVideoStream] = useState(false);
   const [connected, setConnected] = useState(false);
   const [standby, setStandby] = useState(false);
-  const [background, setBackground] = useState<{ type: string; value: string }>({ type: "color", value: "#000000" });
+  const [background, setBackground] = useState<BackgroundConfig>({ type: "color", value: "#000000", opacity: 100 });
   const [activeScene, setActiveScene] = useState("worship");
+  const [activeSceneType, setActiveSceneType] = useState<SceneType>("worship");
+  const [sceneConfig, setSceneConfig] = useState<SceneConfig | null>(null);
   const [showNav, setShowNav] = useState(false);
+  const [canvaOverlayImage, setCanvaOverlayImage] = useState<string | null>(null);
+  const [prevSlideIndex, setPrevSlideIndex] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
 
@@ -53,9 +61,15 @@ export default function ProjectorPage() {
     socket.on("control:scene", (payload: any) => {
       const scene = typeof payload === "string" ? payload : payload.scene;
       if (scene) setActiveScene(scene);
+      if (payload?.sceneType) setActiveSceneType(payload.sceneType);
+      if (payload?.sceneConfig) {
+        setSceneConfig(payload.sceneConfig);
+        // Apply scene background
+        if (payload.sceneConfig.background) setBackground(payload.sceneConfig.background);
+      }
     });
     socket.on("control:standby", (enabled: boolean) => setStandby(enabled));
-    socket.on("control:background", (bg: { type: string; value: string }) => setBackground(bg));
+    socket.on("control:background", (bg: BackgroundConfig) => setBackground(bg));
 
     socket.on("stream:overlayToggled", (payload: { enabled: boolean }) => {
       setOverlayEnabled(payload.enabled);
@@ -63,6 +77,18 @@ export default function ProjectorPage() {
 
     socket.on("stream:overlayPosition", (pos: OverlayPosition) => {
       setOverlayPos(pos);
+    });
+
+    socket.on("stream:overlayOpacity", (opacity: number) => {
+      setOverlayOpacity(opacity);
+    });
+
+    socket.on("stream:overlayHeight", (height: number) => {
+      setOverlayHeight(height);
+    });
+
+    socket.on("stream:canvaOverlay", (imageUrl: string | null) => {
+      setCanvaOverlayImage(imageUrl);
     });
 
     // Receive the active camera's WebRTC offer forwarded by control
@@ -116,6 +142,9 @@ export default function ProjectorPage() {
       socket.off("control:background");
       socket.off("stream:overlayToggled");
       socket.off("stream:overlayPosition");
+      socket.off("stream:overlayOpacity");
+      socket.off("stream:overlayHeight");
+      socket.off("stream:canvaOverlay");
       socket.off("projector:offer");
       socket.off("projector:candidate");
       pcRef.current?.close();
@@ -124,15 +153,46 @@ export default function ProjectorPage() {
   }, []);
 
   const currentSlide = song?.slides[slideIndex] ?? song?.slides[0];
+  const slideTransition = currentSlide?.transition;
+  const transitionClass = slideTransition ? `slide-transition-${slideTransition.type}` : "slide-transition-fade";
+
+  // Track slide changes for transition animation
+  useEffect(() => {
+    setPrevSlideIndex(slideIndex);
+  }, [slideIndex]);
+
+  // Compute background style
+  const bgStyle: React.CSSProperties = {};
+  if (background.type === "color") {
+    bgStyle.background = background.value;
+  } else if (background.type === "image") {
+    bgStyle.backgroundImage = `url(${background.value})`;
+    bgStyle.backgroundSize = "cover";
+    bgStyle.backgroundPosition = "center";
+  }
+  if (background.opacity !== undefined && background.opacity < 100) {
+    bgStyle.opacity = background.opacity / 100;
+  }
 
   return (
-    <main className="projector-screen" style={{ background: background.type === "color" ? background.value : undefined }}>
+    <main className="projector-screen" style={background.type !== "animated" ? bgStyle : { background: "#000" }}>
+      {/* Animated background layer */}
+      {background.type === "animated" && (
+        <div
+          className="projector-animated-bg"
+          style={{
+            background: background.value,
+            opacity: (background.opacity ?? 100) / 100,
+          }}
+        />
+      )}
+
       {/* Standby mode */}
       {standby && (
         <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", zIndex: 20, background: "inherit" }}>
           <div style={{ textAlign: "center", color: "#ffffff80" }}>
             <p style={{ fontSize: 48, fontWeight: 700 }}>⏸</p>
-            <p style={{ fontSize: 24 }}>Standby</p>
+            <p style={{ fontSize: 24 }}>{sceneConfig?.standbyText || "Standby"}</p>
           </div>
         </div>
       )}
@@ -160,21 +220,60 @@ export default function ProjectorPage() {
 
       {/* If no video stream, show lyrics fullscreen (classic mode) */}
       {!standby && !hasVideoStream && currentSlide && (
-        <div className="projector-content">
-          <p className="projector-line" key={`${song?.id}-${slideIndex}`}>
-            {currentSlide.text}
-          </p>
-          <p className="projector-section">
-            {currentSlide.section} • {song?.title}
-          </p>
+        <div className={`projector-content ${transitionClass}`} key={`${song?.id}-${slideIndex}`}>
+          {currentSlide.renderedImage ? (
+            <img src={currentSlide.renderedImage} alt={currentSlide.section} className="pptx-rendered-slide" />
+          ) : (
+            <>
+              <p className="projector-line">
+                {currentSlide.text}
+              </p>
+              <p className="projector-section">
+                {currentSlide.section} • {song?.title}
+              </p>
+            </>
+          )}
         </div>
       )}
 
+      {/* Canva overlay image */}
+      {!standby && canvaOverlayImage && (
+        <div className="canva-overlay-image"><img src={canvaOverlayImage} alt="Canva overlay" /></div>
+      )}
+
+      {/* Scene config overlays */}
+      {!standby && sceneConfig && sceneConfig.overlays.filter((o) => o.visible && o.type !== "lyrics").map((overlay) => (
+        <DraggableOverlay
+          key={overlay.id}
+          position={overlay.position}
+          interactive={false}
+          opacity={overlay.opacity}
+          height={overlay.height}
+        >
+          {overlay.type === "image" && overlay.imageUrl ? (
+            <img src={overlay.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+          ) : overlay.type === "lower-third" ? (
+            <div className="scene-lower-third">
+              <strong>{overlay.text}</strong>
+              {overlay.subtitle && <span>{overlay.subtitle}</span>}
+            </div>
+          ) : (
+            <div className="scene-text-box">
+              <p style={{ whiteSpace: "pre-wrap", margin: 0 }}>{overlay.text}</p>
+            </div>
+          )}
+        </DraggableOverlay>
+      ))}
+
       {/* Lyrics overlay on top of video */}
       {!standby && hasVideoStream && overlayEnabled && currentSlide && (
-        <DraggableOverlay position={overlayPos} interactive={false}>
-          <div className="overlay-lyrics projector-overlay-lyrics">
-            <p key={`${song?.id}-${slideIndex}`}>{currentSlide.text}</p>
+        <DraggableOverlay position={overlayPos} interactive={false} opacity={overlayOpacity} height={overlayHeight}>
+          <div className={`overlay-lyrics projector-overlay-lyrics ${transitionClass}`} key={`${song?.id}-${slideIndex}`}>
+            {currentSlide.renderedImage ? (
+              <img src={currentSlide.renderedImage} alt={currentSlide.section} style={{ maxWidth: "100%", borderRadius: 8 }} />
+            ) : (
+              <p>{currentSlide.text}</p>
+            )}
             <span className="overlay-section">{currentSlide.section} • {song?.title}</span>
           </div>
         </DraggableOverlay>

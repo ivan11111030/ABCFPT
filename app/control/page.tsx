@@ -8,6 +8,8 @@ import { TopBar } from "@/src/components/TopBar";
 import { SetlistPanel } from "@/src/components/SetlistPanel";
 import { LyricsPreviewPanel } from "@/src/components/LyricsPreviewPanel";
 import { SceneControlPanel } from "@/src/components/SceneControlPanel";
+import { SceneEditorPanel } from "@/src/components/SceneEditorPanel";
+import { SceneLibraryPanel } from "@/src/components/SceneLibraryPanel";
 import { AudioMonitorPanel } from "@/src/components/AudioMonitorPanel";
 import { SyncStatusBadge } from "@/src/components/SyncStatusBadge";
 import { CameraPreviewPanel } from "@/src/components/CameraPreviewPanel";
@@ -17,14 +19,19 @@ import { MobileCameraInvitePanel } from "@/src/components/MobileCameraInvitePane
 import { LivestreamStudioPanel } from "@/src/components/LivestreamStudioPanel";
 import { LocalCameraPanel } from "@/src/components/LocalCameraPanel";
 import { SongManagementPanel } from "@/src/components/SongManagementPanel";
-import { DraggableOverlay, LAYOUT_PRESETS, type OverlayLayout, type OverlayPosition } from "@/src/components/DraggableOverlay";
+import { DraggableOverlay, OverlayManualControls, LAYOUT_PRESETS, type OverlayLayout, type OverlayPosition } from "@/src/components/DraggableOverlay";
+import { BackgroundPanel } from "@/src/components/BackgroundPanel";
+import { CanvaIntegrationPanel } from "@/src/components/CanvaIntegrationPanel";
 import { getIceServers } from "@/src/lib/realtimeConfig";
 import { createSocketClient } from "@/src/lib/socket";
 import * as camStore from "@/src/lib/cameraStreamStore";
 import * as songStore from "@/src/lib/songStore";
+import * as sceneStore from "@/src/lib/sceneStore";
 import { sampleCameras } from "@/src/lib/fakeData";
 import { parseFile } from "@/src/lib/songParser";
-import type { Camera, CameraTransition, SceneMode, Song } from "@/src/types/production";
+import type { Camera, CameraTransition, SceneMode, Song, BackgroundConfig } from "@/src/types/production";
+import type { SceneType, SceneConfig, SceneTemplate } from "@/src/types/scene";
+import { DEFAULT_SCENE_CONFIGS } from "@/src/types/scene";
 
 const socket = createSocketClient();
 const iceServers = getIceServers();
@@ -40,6 +47,11 @@ export default function ControlPage() {
   const [songs, setSongs] = useState<Song[]>(songStore.getSongs);
   const [activeSongId, setActiveSongId] = useState(() => songStore.getSongs()[0]?.id ?? "");
   const [activeScene, setActiveScene] = useState<SceneMode>("worship");
+  const [activeSceneType, setActiveSceneType] = useState<SceneType>("worship");
+  const [activeSceneConfig, setActiveSceneConfig] = useState<SceneConfig>(DEFAULT_SCENE_CONFIGS.worship);
+  const [showSceneEditor, setShowSceneEditor] = useState(false);
+  const [showSceneLibrary, setShowSceneLibrary] = useState(false);
+  const [editingScene, setEditingScene] = useState<SceneTemplate | null>(null);
   const [activeCameraId, setActiveCameraId] = useState<string>(sampleCameras[0].id);
   const [previewCameraId, setPreviewCameraId] = useState<string>(sampleCameras[1]?.id ?? sampleCameras[0].id);
   const [cameraTransition, setCameraTransition] = useState<CameraTransition>("cut");
@@ -50,7 +62,7 @@ export default function ControlPage() {
   const [streamKey, setStreamKey] = useState("");
   const [isLive, setIsLive] = useState(false);
   const [standby, setStandby] = useState(false);
-  const [background, setBackground] = useState<{ type: "color" | "image"; value: string }>({ type: "color", value: "#000000" });
+  const [background, setBackground] = useState<BackgroundConfig>({ type: "color", value: "#000000", opacity: 100 });
   const [streamStatus, setStreamStatus] = useState("");
   const [programFlash, setProgramFlash] = useState(false);
   const [showSongManager, setShowSongManager] = useState(false);
@@ -63,6 +75,10 @@ export default function ControlPage() {
   const [overlayEnabled, setOverlayEnabled] = useState(true);
   const [overlayLayout, setOverlayLayout] = useState<OverlayLayout>("lower-third");
   const [overlayPos, setOverlayPos] = useState<OverlayPosition>(LAYOUT_PRESETS["lower-third"]);
+  const [overlayOpacity, setOverlayOpacity] = useState(100);
+  const [overlayHeight, setOverlayHeight] = useState(25);
+  const [showManualControls, setShowManualControls] = useState(false);
+  const [canvaOverlayImage, setCanvaOverlayImage] = useState<string | null>(null);
   const draggingRef = useRef<"left" | "right" | null>(null);
   const startXRef = useRef(0);
   const startWidthRef = useRef(0);
@@ -102,7 +118,7 @@ export default function ControlPage() {
     socket.on("control:slide", (nextSlide: number) => setCurrentSlide(nextSlide));
     socket.on("control:song", (songId: string) => { setActiveSongId(songId); setCurrentSlide(0); });
     socket.on("control:camera", (cameraId: string) => setActiveCameraId(cameraId));
-    socket.on("control:scene", (payload: any) => { const scene = typeof payload === "string" ? payload : payload.scene; if (scene) setActiveScene(scene); });
+    socket.on("control:scene", (payload: any) => { const scene = typeof payload === "string" ? payload : payload.scene; if (scene) setActiveScene(scene); if (payload?.sceneType) setActiveSceneType(payload.sceneType); if (payload?.sceneConfig) setActiveSceneConfig(payload.sceneConfig); });
     socket.on("camera:list", (cameraList: Camera[]) => setCameras(cameraList));
     socket.on("song:list", (songList: Song[]) => songStore.setSongs(songList));
     socket.on("stream:started", () => { setIsLive(true); setStreamStatus("Live"); });
@@ -238,7 +254,7 @@ export default function ControlPage() {
 
   const triggerScene = (scene: SceneMode) => {
     setActiveScene(scene);
-    socket.emit("control:scene", { scene, cameraId: activeCameraId, transition: cameraTransition });
+    socket.emit("control:scene", { scene, cameraId: activeCameraId, transition: cameraTransition, sceneType: activeSceneType, sceneConfig: activeSceneConfig });
     // Scene presets: adjust overlay based on scene
     if (scene === "lyrics") {
       setOverlayEnabled(true);
@@ -249,14 +265,61 @@ export default function ControlPage() {
     }
   };
 
+  const triggerSceneType = (type: SceneType, config: SceneConfig) => {
+    setActiveSceneType(type);
+    setActiveSceneConfig(config);
+    // Map SceneType to SceneMode for backward compat
+    const modeMap: Record<SceneType, SceneMode> = { standby: "worship", worship: "worship", speaker: "speaker", announcement: "announcement" };
+    const mode = modeMap[type];
+    setActiveScene(mode);
+    // Apply scene background
+    setBackground(config.background);
+    socket.emit("control:background", config.background);
+    socket.emit("control:scene", { scene: mode, sceneType: type, sceneConfig: config, cameraId: activeCameraId, transition: cameraTransition });
+    // Standby mode
+    if (type === "standby") {
+      setStandby(true);
+      socket.emit("control:standby", true);
+    } else if (standby) {
+      setStandby(false);
+      socket.emit("control:standby", false);
+    }
+  };
+
+  const handleEditScene = (scene: SceneTemplate) => {
+    setEditingScene(scene);
+    setShowSceneEditor(true);
+    setShowSceneLibrary(false);
+  };
+
+  const handleSaveScene = (updated: SceneTemplate) => {
+    sceneStore.updateScene(updated);
+    sceneStore.saveSceneVersion(updated.id);
+    // If currently active type, apply the update live
+    if (updated.type === activeSceneType) {
+      setActiveSceneConfig(updated.config);
+      socket.emit("control:scene", { scene: activeScene, sceneType: updated.type, sceneConfig: updated.config, cameraId: activeCameraId, transition: cameraTransition });
+    }
+    setShowSceneEditor(false);
+    setEditingScene(null);
+  };
+
+  const handleLoadScene = (scene: SceneTemplate) => {
+    triggerSceneType(scene.type, scene.config);
+    setShowSceneLibrary(false);
+  };
+
+  const handleSceneLivePreview = (config: SceneConfig) => {
+    socket.emit("control:scene", { scene: activeScene, sceneType: activeSceneType, sceneConfig: config, cameraId: activeCameraId, transition: cameraTransition });
+  };
+
   const toggleStandby = () => {
     const next = !standby;
     setStandby(next);
     socket.emit("control:standby", next);
   };
 
-  const changeBackground = (type: "color" | "image", value: string) => {
-    const bg = { type, value };
+  const changeBackground = (bg: BackgroundConfig) => {
     setBackground(bg);
     socket.emit("control:background", bg);
   };
@@ -518,11 +581,14 @@ export default function ControlPage() {
                 {streamByCamera[activeCamera?.id] ? (
                   <>
                     <video ref={programVideoRef} autoPlay muted playsInline className="program-video" />
+                    {canvaOverlayImage && (
+                      <div className="canva-overlay-image"><img src={canvaOverlayImage} alt="Canva overlay" /></div>
+                    )}
                     {overlayEnabled && (
-                      <DraggableOverlay position={overlayPos} onPositionChange={handleOverlayDrag}>
+                      <DraggableOverlay position={overlayPos} onPositionChange={handleOverlayDrag} opacity={overlayOpacity} height={overlayHeight}>
                         <div className="overlay-lyrics">
                           <p>{activeSong.slides[currentSlide]?.text}</p>
-                          <span className="overlay-section">{activeSong.slides[currentSlide]?.section} • {activeCamera.name}</span>
+                          <span className="overlay-section">{activeSong.slides[currentSlide]?.section}</span>
                         </div>
                       </DraggableOverlay>
                     )}
@@ -531,11 +597,14 @@ export default function ControlPage() {
                   <>
                     <img src={snapshotFrames[activeCamera.id]} alt={activeCamera.name} className="program-video" style={{ objectFit: "cover" }} />
                     <span style={{ position: "absolute", top: 6, right: 8, fontSize: 10, background: "rgba(0,0,0,0.6)", padding: "2px 6px", borderRadius: 4, color: "#f59e0b" }}>RELAY</span>
+                    {canvaOverlayImage && (
+                      <div className="canva-overlay-image"><img src={canvaOverlayImage} alt="Canva overlay" /></div>
+                    )}
                     {overlayEnabled && (
-                      <DraggableOverlay position={overlayPos} onPositionChange={handleOverlayDrag}>
+                      <DraggableOverlay position={overlayPos} onPositionChange={handleOverlayDrag} opacity={overlayOpacity} height={overlayHeight}>
                         <div className="overlay-lyrics">
                           <p>{activeSong.slides[currentSlide]?.text}</p>
-                          <span className="overlay-section">{activeSong.slides[currentSlide]?.section} • {activeCamera.name}</span>
+                          <span className="overlay-section">{activeSong.slides[currentSlide]?.section}</span>
                         </div>
                       </DraggableOverlay>
                     )}
@@ -543,7 +612,6 @@ export default function ControlPage() {
                 ) : (
                   <div>
                     <p>{activeSong.slides[currentSlide]?.text}</p>
-                    <p className="camera-name">{activeCamera.name}</p>
                   </div>
                 )}
               </div>
@@ -593,14 +661,44 @@ export default function ControlPage() {
                 </button>
               </div>
               {overlayEnabled && (
-                <div className="overlay-presets">
-                  {(["lower-third", "top-bar", "pip-corner", "full"] as const).map((l) => (
-                    <button key={l} type="button" className={`button ${overlayLayout === l ? "primary" : "subtle"}`} style={{ padding: "6px 10px", fontSize: 11 }} onClick={() => changeOverlayLayout(l)}>
-                      {l === "lower-third" ? "Lower Third" : l === "top-bar" ? "Top Bar" : l === "pip-corner" ? "PIP Corner" : "Full"}
-                    </button>
-                  ))}
-                  {overlayLayout === "custom" && <span style={{ fontSize: 11, color: "var(--accent)" }}>Custom (drag to move)</span>}
-                </div>
+                <>
+                  <div className="overlay-presets">
+                    {(["lower-third", "top-bar", "pip-corner", "full"] as const).map((l) => (
+                      <button key={l} type="button" className={`button ${overlayLayout === l ? "primary" : "subtle"}`} style={{ padding: "6px 10px", fontSize: 11 }} onClick={() => changeOverlayLayout(l)}>
+                        {l === "lower-third" ? "Lower Third" : l === "top-bar" ? "Top Bar" : l === "pip-corner" ? "PIP Corner" : "Full"}
+                      </button>
+                    ))}
+                    {overlayLayout === "custom" && <span style={{ fontSize: 11, color: "var(--accent)" }}>Custom (drag to move)</span>}
+                  </div>
+                  <button
+                    type="button"
+                    className={`button ${showManualControls ? "primary" : "subtle"}`}
+                    style={{ padding: "6px 10px", fontSize: 11, marginTop: 4, width: "100%" }}
+                    onClick={() => setShowManualControls(!showManualControls)}
+                  >
+                    {showManualControls ? "▲ Hide" : "▼ Show"} Manual Adjustments
+                  </button>
+                  {showManualControls && (
+                    <OverlayManualControls
+                      position={overlayPos}
+                      onPositionChange={(pos) => {
+                        setOverlayLayout("custom");
+                        setOverlayPos(pos);
+                        socket.emit("stream:overlayPosition", pos);
+                      }}
+                      opacity={overlayOpacity}
+                      onOpacityChange={(v) => {
+                        setOverlayOpacity(v);
+                        socket.emit("stream:overlayOpacity", v);
+                      }}
+                      height={overlayHeight}
+                      onHeightChange={(v) => {
+                        setOverlayHeight(v);
+                        socket.emit("stream:overlayHeight", v);
+                      }}
+                    />
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -616,7 +714,7 @@ export default function ControlPage() {
         <div className="control-right">
           <CameraPreviewPanel cameras={cameras} activeCameraId={previewCameraId} programCameraId={activeCameraId} onSelectCamera={selectCamera} onRemoveCamera={handleRemoveCamera} onHoverCamera={(id) => id && setPreviewCameraId(id)} />
           <CameraTransitionPanel transition={cameraTransition} onChangeTransition={changeTransition} />
-          <SceneControlPanel activeScene={activeScene} onSceneChange={triggerScene} />
+          <SceneControlPanel activeSceneType={activeSceneType} onSceneChange={triggerSceneType} onEditScene={handleEditScene} onOpenLibrary={() => setShowSceneLibrary(true)} />
           <LivestreamStudioPanel
             activeScene={activeScene}
             activeCamera={activeCamera}
@@ -630,18 +728,17 @@ export default function ControlPage() {
             onChangeStreamKey={setStreamKey}
           />
           {/* Standby & Background */}
-          <section className="scene-panel">
-            <div className="panel-header"><p>Standby &amp; Background</p></div>
-            <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-              <button type="button" className={`button ${standby ? "danger" : "outline"}`} style={{ flex: 1 }} onClick={toggleStandby}>
-                {standby ? "⏸ Standby ON" : "▶ Go Live View"}
-              </button>
-            </div>
-            <label style={{ display: "block", marginBottom: 6, fontSize: 12, color: "var(--muted)" }}>
-              Background Color
-              <input type="color" value={background.value} onChange={(e) => changeBackground("color", e.target.value)} style={{ width: "100%", height: 32, border: "none", borderRadius: 6, cursor: "pointer" }} />
-            </label>
-          </section>
+          <BackgroundPanel
+            background={background}
+            onBackgroundChange={changeBackground}
+            standby={standby}
+            onToggleStandby={toggleStandby}
+          />
+          {/* Canva Integration */}
+          <CanvaIntegrationPanel
+            onApplyAsOverlay={(imageUrl) => setCanvaOverlayImage(imageUrl)}
+            onApplyAsBackground={(bg) => changeBackground(bg)}
+          />
           <AudioMonitorPanel />
           <CameraDiscoveryPanel onAddCamera={handleAddCamera} />
           <LocalCameraPanel onAddCamera={handleAddCamera} />
@@ -663,7 +760,7 @@ export default function ControlPage() {
           Next Song <kbd>S</kbd>
         </button>
         <button type="button" className="button subtle" onClick={() => triggerScene(activeScene)}>
-          Scene: {activeScene}
+          Scene: {activeSceneType}
         </button>
       </div>
 
@@ -681,6 +778,33 @@ export default function ControlPage() {
               onAddSong={handleAddSong}
               onUpdateSong={handleUpdateSong}
               onDeleteSong={handleDeleteSong}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* SCENE EDITOR MODAL */}
+      {showSceneEditor && editingScene && (
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) { setShowSceneEditor(false); setEditingScene(null); } }}>
+          <div className="modal-content modal-wide">
+            <SceneEditorPanel
+              scene={editingScene}
+              onSave={handleSaveScene}
+              onClose={() => { setShowSceneEditor(false); setEditingScene(null); }}
+              onLivePreview={handleSceneLivePreview}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* SCENE LIBRARY MODAL */}
+      {showSceneLibrary && (
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowSceneLibrary(false); }}>
+          <div className="modal-content modal-wide">
+            <SceneLibraryPanel
+              onLoadScene={handleLoadScene}
+              onEditScene={handleEditScene}
+              onClose={() => setShowSceneLibrary(false)}
             />
           </div>
         </div>

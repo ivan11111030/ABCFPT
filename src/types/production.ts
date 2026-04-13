@@ -6,6 +6,34 @@ export type Slide = {
   text: string;
   notes?: string;
   background?: string;
+  /** Base64 rendered image of the original PPTX slide (preserves fonts/layout) */
+  renderedImage?: string;
+  /** Raw OOXML for the slide (fonts, animations, transitions) */
+  rawXml?: string;
+  /** Transition metadata extracted from PPTX */
+  transition?: SlideTransition;
+};
+
+export type SlideTransition = {
+  type: string;       // e.g. "fade", "push", "wipe", "split"
+  duration: number;   // milliseconds
+  advanceAfter?: number; // auto-advance ms (0 = manual)
+};
+
+export type BackgroundConfig = {
+  type: "color" | "image" | "animated";
+  value: string;           // hex color, image URL/data-uri, or animation preset name
+  opacity?: number;        // 0-100
+  animationPreset?: string; // for animated backgrounds
+};
+
+export type CanvaDesign = {
+  id: string;
+  title: string;
+  thumbnailUrl: string;
+  exportUrl: string;
+  type: "overlay" | "background";
+  importedAt: number;
 };
 
 export type Song = {

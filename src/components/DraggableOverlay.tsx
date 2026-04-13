@@ -22,9 +22,105 @@ type DraggableOverlayProps = {
   onPositionChange?: (pos: OverlayPosition) => void;
   children: ReactNode;
   interactive?: boolean;
+  /** Show manual adjustment sliders */
+  showManualControls?: boolean;
+  /** Overlay visibility 0-100 */
+  opacity?: number;
+  onOpacityChange?: (opacity: number) => void;
+  /** Overlay height percentage 5-100 */
+  height?: number;
+  onHeightChange?: (height: number) => void;
 };
 
-export function DraggableOverlay({ position, onPositionChange, children, interactive = true }: DraggableOverlayProps) {
+export function OverlayManualControls({
+  position,
+  onPositionChange,
+  opacity,
+  onOpacityChange,
+  height,
+  onHeightChange,
+}: {
+  position: OverlayPosition;
+  onPositionChange: (pos: OverlayPosition) => void;
+  opacity: number;
+  onOpacityChange: (v: number) => void;
+  height: number;
+  onHeightChange: (v: number) => void;
+}) {
+  return (
+    <div className="overlay-manual-controls">
+      <div className="overlay-manual-row">
+        <label>X Position</label>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={position.x}
+          onChange={(e) => onPositionChange({ ...position, x: Number(e.target.value) })}
+        />
+        <span>{Math.round(position.x)}%</span>
+      </div>
+      <div className="overlay-manual-row">
+        <label>Y Position</label>
+        <input
+          type="range"
+          min={0}
+          max={95}
+          step={1}
+          value={position.y}
+          onChange={(e) => onPositionChange({ ...position, y: Number(e.target.value) })}
+        />
+        <span>{Math.round(position.y)}%</span>
+      </div>
+      <div className="overlay-manual-row">
+        <label>Width</label>
+        <input
+          type="range"
+          min={15}
+          max={100}
+          step={1}
+          value={position.width}
+          onChange={(e) => onPositionChange({ ...position, width: Number(e.target.value) })}
+        />
+        <span>{Math.round(position.width)}%</span>
+      </div>
+      <div className="overlay-manual-row">
+        <label>Opacity</label>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={opacity}
+          onChange={(e) => onOpacityChange(Number(e.target.value))}
+        />
+        <span>{opacity}%</span>
+      </div>
+      <div className="overlay-manual-row">
+        <label>Height</label>
+        <input
+          type="range"
+          min={5}
+          max={100}
+          step={1}
+          value={height}
+          onChange={(e) => onHeightChange(Number(e.target.value))}
+        />
+        <span>{height}%</span>
+      </div>
+    </div>
+  );
+}
+
+export function DraggableOverlay({
+  position,
+  onPositionChange,
+  children,
+  interactive = true,
+  opacity = 100,
+  height,
+}: DraggableOverlayProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
   const resizeRef = useRef<{ startX: number; origW: number } | null>(null);
@@ -106,6 +202,8 @@ export function DraggableOverlay({ position, onPositionChange, children, interac
         left: `${position.x}%`,
         top: `${position.y}%`,
         width: `${position.width}%`,
+        opacity: opacity / 100,
+        ...(height !== undefined ? { height: `${height}%` } : {}),
       }}
       onMouseDown={handleDragStart}
     >
