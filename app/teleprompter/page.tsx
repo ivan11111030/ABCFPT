@@ -15,6 +15,7 @@ export default function TeleprompterPage() {
   const [fontSize, setFontSize] = useState(42);
   const [darkMode, setDarkMode] = useState(true);
   const [connected, setConnected] = useState(false);
+  const [showNav, setShowNav] = useState(false);
 
   const song = songs.find((s) => s.id === currentSongId) ?? songs[0];
 
@@ -58,34 +59,27 @@ export default function TeleprompterPage() {
 
   return (
     <main className={darkMode ? "teleprompter-shell dark" : "teleprompter-shell"}>
-      <header className="teleprompter-header">
+      {/* Hidden nav bar - only visible on hover at top (same as projector) */}
+      <div
+        style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 30, padding: "8px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", opacity: showNav ? 1 : 0, transition: "opacity 0.3s", background: "rgba(0,0,0,0.75)", pointerEvents: showNav ? "auto" : "none" }}
+        onMouseEnter={() => setShowNav(true)}
+        onMouseLeave={() => setShowNav(false)}
+      >
+        <Link href="/control" style={{ color: "#fff", textDecoration: "none", fontSize: 14, padding: "6px 12px", background: "rgba(255,255,255,0.15)", borderRadius: 8 }}>
+          ← Back to Control
+        </Link>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Link href="/control" style={{ color: "inherit", textDecoration: "none", padding: "6px 12px", background: "rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 14 }}>
-            ← Back
-          </Link>
-          <div>
-            <p className="track-label">Teleprompter</p>
-            <h1 style={{ fontSize: 22 }}>{song?.title}</h1>
-            <p style={{ color: "var(--muted)", fontSize: 14 }}>{currentSlide?.section}</p>
-          </div>
-        </div>
-        <div className="teleprompter-controls">
           <span style={{ fontSize: 12, color: connected ? "var(--success)" : "var(--danger)" }}>
             {connected ? "🟢 Synced" : "🔴 Offline"}
           </span>
-          <button onClick={() => setDarkMode((s) => !s)} className="button subtle">
-            {darkMode ? "☀️ Light" : "🌙 Dark"}
+          <button onClick={() => setDarkMode((s) => !s)} className="button subtle" style={{ fontSize: 12 }}>
+            {darkMode ? "☀️" : "🌙"}
           </button>
-          <input
-            type="range"
-            min="28"
-            max="70"
-            value={fontSize}
-            onChange={(e) => setFontSize(Number(e.target.value))}
-            title="Font size"
-          />
+          <input type="range" min="28" max="70" value={fontSize} onChange={(e) => setFontSize(Number(e.target.value))} title="Font size" style={{ width: 80 }} />
         </div>
-      </header>
+      </div>
+      {/* Invisible hover trigger at top */}
+      <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: 30, zIndex: 31 }} onMouseEnter={() => setShowNav(true)} />
 
       <section className="teleprompter-stage" style={{ fontSize }}>
         <div>

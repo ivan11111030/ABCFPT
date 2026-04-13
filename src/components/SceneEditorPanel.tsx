@@ -4,7 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import type { SceneTemplate, SceneType, SceneConfig, SceneOverlay } from "@/src/types/scene";
 import { DEFAULT_SCENE_CONFIGS } from "@/src/types/scene";
 import { DraggableOverlay, OverlayManualControls, type OverlayPosition } from "@/src/components/DraggableOverlay";
-import type { BackgroundConfig } from "@/src/types/production";
+import type { BackgroundConfig, TextStyle } from "@/src/types/production";
 
 /* ── Animated background presets (same as BackgroundPanel) ── */
 const ANIMATED_PRESETS = [
@@ -15,6 +15,49 @@ const ANIMATED_PRESETS = [
   { id: "northern-lights", label: "Northern Lights", css: "linear-gradient(135deg, #0f0c29, #302b63, #24243e, #0f0c29)" },
   { id: "fire-glow", label: "Fire Glow", css: "linear-gradient(270deg, #1a0000, #4a1414, #2d0a0a, #1a0000)" },
 ];
+
+const WEB_FONTS = ["Inter", "Arial", "Georgia", "Merriweather", "Roboto", "Oswald", "Playfair Display", "Montserrat", "Open Sans", "Lato"];
+
+type TextStyleControlsProps = {
+  style: TextStyle;
+  onChange: (s: TextStyle) => void;
+};
+
+function TextStyleControls({ style, onChange }: TextStyleControlsProps) {
+  return (
+    <div className="text-style-controls">
+      <div className="tsc-row">
+        <label>Font</label>
+        <select className="se-input" value={style.fontFamily ?? "Inter"} onChange={(e) => onChange({ ...style, fontFamily: e.target.value })} style={{ flex: 1 }}>
+          {WEB_FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
+        </select>
+      </div>
+      <div className="tsc-row">
+        <label>Size</label>
+        <input type="number" className="se-input" min={10} max={120} value={style.fontSize ?? 32} onChange={(e) => onChange({ ...style, fontSize: Number(e.target.value) })} style={{ width: 60 }} />
+        <span style={{ fontSize: 10, color: "var(--text-dim)" }}>px</span>
+      </div>
+      <div className="tsc-row">
+        <label>Color</label>
+        <input type="color" value={style.color ?? "#ffffff"} onChange={(e) => onChange({ ...style, color: e.target.value })} style={{ width: 36, height: 24, border: "none", borderRadius: 4, cursor: "pointer", background: "none", padding: 0 }} />
+        <span style={{ fontSize: 10, color: "var(--text-dim)" }}>{style.color ?? "#ffffff"}</span>
+      </div>
+      <div className="tsc-row">
+        <label>Align</label>
+        {(["left", "center", "right"] as const).map((a) => (
+          <button key={a} type="button" className={`button ${style.align === a ? "primary" : "subtle"}`} style={{ padding: "2px 7px", fontSize: 11 }} onClick={() => onChange({ ...style, align: a })}>
+            {a === "left" ? "⬅" : a === "center" ? "↔" : "➡"}
+          </button>
+        ))}
+      </div>
+      <div className="tsc-row">
+        <label>Style</label>
+        <button type="button" className={`button ${style.bold ? "primary" : "subtle"}`} style={{ padding: "2px 7px", fontSize: 11, fontWeight: 700 }} onClick={() => onChange({ ...style, bold: !style.bold })}>B</button>
+        <button type="button" className={`button ${style.italic ? "primary" : "subtle"}`} style={{ padding: "2px 7px", fontSize: 11, fontStyle: "italic" }} onClick={() => onChange({ ...style, italic: !style.italic })}>I</button>
+      </div>
+    </div>
+  );
+}
 
 type SceneEditorPanelProps = {
   scene: SceneTemplate;
@@ -268,12 +311,12 @@ export function SceneEditorPanel({ scene, onSave, onClose, onLivePreview }: Scen
                   {overlay.type === "image" && overlay.imageUrl ? (
                     <img src={overlay.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
                   ) : overlay.type === "lower-third" ? (
-                    <div className="se-lower-third-preview">
-                      <strong>{overlay.text}</strong>
+                    <div className="se-lower-third-preview" style={{ fontFamily: overlay.textStyle?.fontFamily, color: overlay.textStyle?.color }}>
+                      <strong style={{ fontSize: overlay.textStyle?.fontSize, fontWeight: overlay.textStyle?.bold === false ? 400 : 700, fontStyle: overlay.textStyle?.italic ? "italic" : undefined }}>{overlay.text}</strong>
                       {overlay.subtitle && <span>{overlay.subtitle}</span>}
                     </div>
                   ) : (
-                    <p style={{ whiteSpace: "pre-wrap", margin: 0, fontSize: 14, color: "#fff" }}>{overlay.text}</p>
+                    <p style={{ whiteSpace: "pre-wrap", margin: 0, fontSize: overlay.textStyle?.fontSize ?? 14, color: overlay.textStyle?.color ?? "#fff", fontFamily: overlay.textStyle?.fontFamily, textAlign: overlay.textStyle?.align ?? "center", fontWeight: overlay.textStyle?.bold ? 700 : undefined, fontStyle: overlay.textStyle?.italic ? "italic" : undefined }}>{overlay.text}</p>
                   )}
                 </div>
               </DraggableOverlay>
@@ -391,6 +434,15 @@ export function SceneEditorPanel({ scene, onSave, onClose, onLivePreview }: Scen
                     onChange={(e) => updateOverlay(activeOverlay.id, { subtitle: e.target.value })}
                   />
                 </div>
+              )}
+              {activeOverlay.type !== "image" && (
+                <>
+                  <p className="se-section-title" style={{ marginTop: 8 }}>Text Style</p>
+                  <TextStyleControls
+                    style={activeOverlay.textStyle ?? {}}
+                    onChange={(ts) => updateOverlay(activeOverlay.id, { textStyle: ts })}
+                  />
+                </>
               )}
               <OverlayManualControls
                 position={activeOverlay.position}

@@ -1,8 +1,41 @@
 "use client";
 
 import { useRef, useState, type DragEvent } from "react";
-import type { Song, Slide } from "@/src/types/production";
+import type { Song, Slide, TextStyle } from "@/src/types/production";
 import * as songStore from "@/src/lib/songStore";
+
+const WEB_FONTS = ["Inter", "Arial", "Georgia", "Merriweather", "Roboto", "Oswald", "Playfair Display", "Montserrat", "Open Sans", "Lato"];
+
+function TextStyleControls({ style = {}, onChange }: { style?: TextStyle; onChange: (s: TextStyle) => void }) {
+  return (
+    <div className="text-style-controls" style={{ marginTop: 6 }}>
+      <div className="tsc-row">
+        <label>Font</label>
+        <select style={{ flex: 1, padding: "3px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--card)", color: "var(--text)", fontSize: 11 }} value={style.fontFamily ?? ""} onChange={(e) => onChange({ ...style, fontFamily: e.target.value || undefined })}>
+          <option value="">Default</option>
+          {WEB_FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
+        </select>
+      </div>
+      <div className="tsc-row">
+        <label>Size</label>
+        <input type="number" min={16} max={120} style={{ width: 60, padding: "3px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--card)", color: "var(--text)", fontSize: 11 }} value={style.fontSize ?? ""} placeholder="–" onChange={(e) => onChange({ ...style, fontSize: e.target.value ? Number(e.target.value) : undefined })} />
+        <span style={{ fontSize: 10, color: "var(--muted)" }}>px</span>
+        <label style={{ marginLeft: 8 }}>Color</label>
+        <input type="color" value={style.color ?? "#ffffff"} onChange={(e) => onChange({ ...style, color: e.target.value })} style={{ width: 30, height: 22, border: "none", borderRadius: 4, cursor: "pointer", background: "none", padding: 0 }} />
+      </div>
+      <div className="tsc-row">
+        <label>Align</label>
+        {(["left", "center", "right"] as const).map((a) => (
+          <button key={a} type="button" style={{ padding: "2px 7px", fontSize: 11, borderRadius: 4, border: "1px solid var(--border)", background: style.align === a ? "var(--accent)" : "transparent", color: style.align === a ? "#000" : "var(--text)", cursor: "pointer" }} onClick={() => onChange({ ...style, align: style.align === a ? undefined : a })}>
+            {a === "left" ? "⬅" : a === "center" ? "↔" : "➡"}
+          </button>
+        ))}
+        <button type="button" style={{ marginLeft: 6, padding: "2px 7px", fontSize: 11, fontWeight: 700, borderRadius: 4, border: "1px solid var(--border)", background: style.bold ? "var(--accent)" : "transparent", color: style.bold ? "#000" : "var(--text)", cursor: "pointer" }} onClick={() => onChange({ ...style, bold: !style.bold })}>B</button>
+        <button type="button" style={{ padding: "2px 7px", fontSize: 11, fontStyle: "italic", borderRadius: 4, border: "1px solid var(--border)", background: style.italic ? "var(--accent)" : "transparent", color: style.italic ? "#000" : "var(--text)", cursor: "pointer" }} onClick={() => onChange({ ...style, italic: !style.italic })}>I</button>
+      </div>
+    </div>
+  );
+}
 
 type SongManagementPanelProps = {
   songs: Song[];
@@ -166,6 +199,16 @@ export function SongManagementPanel({ songs, onImportSong, onAddSong, onUpdateSo
             <textarea value={slide.notes ?? ""} onChange={(e) => handleUpdateSlide(song, setSong, i, "notes", e.target.value)}
               placeholder="Speaker notes (optional)..." rows={1}
               style={{ flex: 1, padding: "6px 10px", borderRadius: 8, border: "1px dashed var(--border)", background: "transparent", color: "var(--muted)", fontSize: 12, resize: "vertical", fontStyle: "italic" }} />
+          </div>
+          <div style={{ marginLeft: 32 }}>
+            <TextStyleControls
+              style={slide.textStyle}
+              onChange={(ts) => {
+                const slides = [...song.slides];
+                slides[i] = { ...slides[i], textStyle: ts };
+                setSong({ ...song, slides });
+              }}
+            />
           </div>
         </div>
       ))}

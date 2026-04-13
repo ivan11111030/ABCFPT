@@ -161,31 +161,29 @@ export default function ProjectorPage() {
     setPrevSlideIndex(slideIndex);
   }, [slideIndex]);
 
-  // Compute background style
-  const bgStyle: React.CSSProperties = {};
+  // Compute background layer style (applied to a dedicated layer, not <main>, so opacity never affects text)
+  const bgLayerStyle: React.CSSProperties = {
+    position: "absolute",
+    inset: 0,
+    zIndex: 0,
+    opacity: (background.opacity ?? 100) / 100,
+  };
   if (background.type === "color") {
-    bgStyle.background = background.value;
+    bgLayerStyle.background = background.value;
   } else if (background.type === "image") {
-    bgStyle.backgroundImage = `url(${background.value})`;
-    bgStyle.backgroundSize = "cover";
-    bgStyle.backgroundPosition = "center";
-  }
-  if (background.opacity !== undefined && background.opacity < 100) {
-    bgStyle.opacity = background.opacity / 100;
+    bgLayerStyle.backgroundImage = `url(${background.value})`;
+    bgLayerStyle.backgroundSize = "cover";
+    bgLayerStyle.backgroundPosition = "center";
+  } else if (background.type === "animated") {
+    bgLayerStyle.background = background.value;
+    bgLayerStyle.backgroundSize = "400% 400%";
+    (bgLayerStyle as any).animation = "bg-animate 8s ease infinite";
   }
 
   return (
-    <main className="projector-screen" style={background.type !== "animated" ? bgStyle : { background: "#000" }}>
-      {/* Animated background layer */}
-      {background.type === "animated" && (
-        <div
-          className="projector-animated-bg"
-          style={{
-            background: background.value,
-            opacity: (background.opacity ?? 100) / 100,
-          }}
-        />
-      )}
+    <main className="projector-screen" style={{ background: "#000" }}>
+      {/* Unified background layer — opacity only affects this layer, never text */}
+      <div style={bgLayerStyle} />
 
       {/* Standby mode */}
       {standby && (
@@ -225,7 +223,17 @@ export default function ProjectorPage() {
             <img src={currentSlide.renderedImage} alt={currentSlide.section} className="pptx-rendered-slide" />
           ) : (
             <>
-              <p className="projector-line">
+              <p
+                className="projector-line"
+                style={{
+                  fontFamily: currentSlide.textStyle?.fontFamily,
+                  fontSize: currentSlide.textStyle?.fontSize ? `${currentSlide.textStyle.fontSize}px` : undefined,
+                  color: currentSlide.textStyle?.color ?? "#fff",
+                  textAlign: currentSlide.textStyle?.align ?? "center",
+                  fontWeight: currentSlide.textStyle?.bold ? 700 : undefined,
+                  fontStyle: currentSlide.textStyle?.italic ? "italic" : undefined,
+                }}
+              >
                 {currentSlide.text}
               </p>
               <p className="projector-section">
@@ -253,12 +261,12 @@ export default function ProjectorPage() {
           {overlay.type === "image" && overlay.imageUrl ? (
             <img src={overlay.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
           ) : overlay.type === "lower-third" ? (
-            <div className="scene-lower-third">
-              <strong>{overlay.text}</strong>
+            <div className="scene-lower-third" style={{ fontFamily: overlay.textStyle?.fontFamily, color: overlay.textStyle?.color, textAlign: overlay.textStyle?.align }}>
+              <strong style={{ fontSize: overlay.textStyle?.fontSize, fontWeight: overlay.textStyle?.bold === false ? 400 : 700, fontStyle: overlay.textStyle?.italic ? "italic" : undefined }}>{overlay.text}</strong>
               {overlay.subtitle && <span>{overlay.subtitle}</span>}
             </div>
           ) : (
-            <div className="scene-text-box">
+            <div className="scene-text-box" style={{ fontFamily: overlay.textStyle?.fontFamily, fontSize: overlay.textStyle?.fontSize, color: overlay.textStyle?.color ?? "#fff", textAlign: overlay.textStyle?.align, fontWeight: overlay.textStyle?.bold ? 700 : undefined, fontStyle: overlay.textStyle?.italic ? "italic" : undefined }}>
               <p style={{ whiteSpace: "pre-wrap", margin: 0 }}>{overlay.text}</p>
             </div>
           )}

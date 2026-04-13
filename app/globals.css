@@ -1267,38 +1267,12 @@ h1, h2, h3, p { margin: 0; }
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  padding: var(--sp-3);
-  gap: var(--sp-3);
+  padding: 0;
+  gap: 0;
 }
 
 .teleprompter-shell.dark {
   background: #0a0f1c;
-}
-
-.teleprompter-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--sp-2);
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: var(--sp-2);
-}
-
-.track-label {
-  color: var(--accent);
-  text-transform: uppercase;
-  letter-spacing: 0.18em;
-  font-size: var(--font-label);
-  font-weight: 700;
-  margin-bottom: var(--sp-1);
-}
-
-.teleprompter-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-1);
 }
 
 .teleprompter-stage {
@@ -1306,9 +1280,6 @@ h1, h2, h3, p { margin: 0; }
   display: grid;
   place-items: center;
   padding: 48px;
-  border-radius: 20px;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid var(--border);
 }
 
 .teleprompter-current {
@@ -1324,7 +1295,7 @@ h1, h2, h3, p { margin: 0; }
   text-align: center;
   font-size: 0.6em;
   padding-top: var(--sp-2);
-  border-top: 1px solid var(--border);
+  border-top: 1px solid rgba(255,255,255,0.1);
 }
 
 .teleprompter-footer {
@@ -1332,10 +1303,31 @@ h1, h2, h3, p { margin: 0; }
   justify-content: center;
   color: var(--muted);
   font-size: var(--font-label);
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: var(--sp-2);
+  padding: 8px var(--sp-2);
+  background: rgba(0,0,0,0.4);
+}
+
+/* ──────────────────────────────────────────────────────
+   Text Style Controls (shared between scene & song editors)
+   ────────────────────────────────────────────────────── */
+
+.text-style-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.tsc-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tsc-row label {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  min-width: 36px;
 }
 
 /* ========== PROJECTOR ========== */
@@ -1357,6 +1349,8 @@ h1, h2, h3, p { margin: 0; }
   padding: 48px;
   width: 100%;
   max-width: 1200px;
+  position: relative;
+  z-index: 1;
 }
 
 .projector-line {
@@ -1960,7 +1954,7 @@ h1, h2, h3, p { margin: 0; }
   width: 100%;
   height: 100%;
   object-fit: cover;
-  z-index: 0;
+  z-index: 1;
 }
 
 .projector-screen {

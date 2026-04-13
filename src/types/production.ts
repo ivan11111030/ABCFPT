@@ -1,11 +1,23 @@
 export type SceneMode = "worship" | "speaker" | "announcement" | "lyrics";
 
+/** Reusable text style applied to slide text or scene overlays */
+export type TextStyle = {
+  fontFamily?: string;
+  fontSize?: number;      // px
+  color?: string;         // hex
+  align?: "left" | "center" | "right";
+  bold?: boolean;
+  italic?: boolean;
+};
+
 export type Slide = {
   id: string;
   section: string;
   text: string;
   notes?: string;
   background?: string;
+  /** Per-slide text style overrides */
+  textStyle?: TextStyle;
   /** Base64 rendered image of the original PPTX slide (preserves fonts/layout) */
   renderedImage?: string;
   /** Raw OOXML for the slide (fonts, animations, transitions) */

@@ -1,4 +1,4 @@
-import type { BackgroundConfig, SlideTransition } from "./production";
+import type { BackgroundConfig, SlideTransition, TextStyle } from "./production";
 import type { OverlayPosition, OverlayLayout } from "@/src/components/DraggableOverlay";
 
 /* ─────────────────────────────────────────────────────
@@ -22,6 +22,8 @@ export type SceneOverlay = {
   opacity: number;   // 0–100
   height: number;    // % 5–100
   visible: boolean;
+  /** Optional text style overrides */
+  textStyle?: TextStyle;
 };
 
 /** A single version snapshot of a scene */
