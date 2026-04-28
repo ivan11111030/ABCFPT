@@ -11,6 +11,7 @@ export default function TeleprompterPage() {
   const [song, setSong] = useState<Song>(sampleSongs[0]);
   const [slideIndex, setSlideIndex] = useState(0);
   const [fontSize, setFontSize] = useState(42);
+  const [fontColor, setFontColor] = useState("#ffffff");
   const [darkMode, setDarkMode] = useState(true);
 
   useEffect(() => {
@@ -41,19 +42,34 @@ export default function TeleprompterPage() {
           <button onClick={() => setDarkMode((state) => !state)} className="button subtle">
             {darkMode ? "Light" : "Dark"}
           </button>
-          <input
-            type="range"
-            min="28"
-            max="70"
-            value={fontSize}
-            onChange={(event) => setFontSize(Number(event.target.value))}
-          />
+          <div className="control-group">
+            <label>
+              Font Size
+              <input
+                type="range"
+                min="28"
+                max="70"
+                value={fontSize}
+                onChange={(event) => setFontSize(Number(event.target.value))}
+              />
+            </label>
+          </div>
+          <div className="control-group">
+            <label>
+              Font Color
+              <input
+                type="color"
+                value={fontColor}
+                onChange={(event) => setFontColor(event.target.value)}
+              />
+            </label>
+          </div>
         </div>
       </header>
 
-      <section className="teleprompter-stage" style={{ fontSize }}>
+      <section className="teleprompter-stage" style={{ fontSize, color: fontColor }}>
         <p className="teleprompter-current">{currentSlide.text}</p>
-        {nextLine && <p className="teleprompter-next">Next: {nextLine}</p>}
+        {nextLine && <p className="teleprompter-next" style={{ color: fontColor, opacity: 0.6 }}>Next: {nextLine}</p>}
       </section>
 
       <footer className="teleprompter-footer">

@@ -8,7 +8,8 @@ const nextConfig = {
     unoptimized: true
   },
   env: {
-    SOCKET_SERVER_URL: process.env.SOCKET_SERVER_URL || "http://localhost:4000"
+    SOCKET_SERVER_URL: process.env.SOCKET_SERVER_URL || "http://localhost:4000",
+    NEXT_PUBLIC_SOCKET_SERVER_URL: process.env.SOCKET_SERVER_URL || "http://localhost:4000"
   }
 };
 

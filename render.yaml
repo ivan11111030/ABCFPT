@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: abcfpt-socket
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm run dev:server
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+    plan: free
+    region: oregon
+
+  - type: static
+    name: abcfpt-web
+    staticPublishPath: ./out
+    buildCommand: npm install && npm run build
+    envVars:
+      - key: SOCKET_SERVER_URL
+        fromService:
+          name: abcfpt-socket
+          type: web
+          property: url

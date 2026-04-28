@@ -4,8 +4,24 @@
 
 - Node.js 20+ or compatible runtime
 - npm 10+ / pnpm / yarn
+- **FFmpeg** (for RTMP/Facebook Live streaming)
 - Local network access for WebRTC and mobile camera connections
 - Optional: Linux desktop or laptop for PWA install
+
+### Installing FFmpeg
+
+**Ubuntu/Debian:**
+```bash
+sudo apt-get update && sudo apt-get install -y ffmpeg
+```
+
+**macOS:**
+```bash
+brew install ffmpeg
+```
+
+**Windows:**
+Download from https://ffmpeg.org/download.html
 
 ## Deployment Options
 
@@ -15,15 +31,16 @@
    ```bash
    npm install
    ```
-2. Start the socket server:
+2. Make sure FFmpeg is installed and accessible
+3. Start the socket server:
    ```bash
    npm run dev:server
    ```
-3. Start the Next.js app:
+4. Start the Next.js app (in another terminal):
    ```bash
    npm run dev:web
    ```
-4. Open the dashboard at `http://localhost:3000/control`
+5. Open the dashboard at `http://localhost:3000/ABCFPT/control`
 
 ### Combined Development
 
@@ -50,6 +67,44 @@ npm run dev
 - Use HTTPS for secure WebRTC and camera signaling
 - Cache static assets at the edge for low latency
 
+## Facebook Live / RTMP Streaming
+
+The app now supports professional-grade streaming to Facebook Live and other RTMP endpoints.
+
+**For detailed professional streaming setup, see [PROFESSIONAL_STREAMING.md](PROFESSIONAL_STREAMING.md)**
+
+### Quick Start
+
+1. **With OBS Studio (Recommended):**
+   - Install OBS Studio
+   - Enable WebSocket Server in OBS (Tools → WebSocket Server Settings)
+   - Set environment variables: `OBS_HOST`, `OBS_PORT`, `OBS_PASSWORD`
+   - Start server: `npm run dev:server`
+   - OBS will auto-connect
+
+2. **With Direct RTMP:**
+   - Configure cameras in [server/camera-sources.ts](server/camera-sources.ts)
+   - Get stream key from Facebook Live
+   - In app dashboard: Select camera, enter RTMP URL & key, choose quality profile
+   - Click **Start Stream**
+
+### Key Features
+
+- ✅ OBS Studio integration (multi-camera, transitions, effects)
+- ✅ Direct RTMP encoding (standalone operation)
+- ✅ Multiple encoding profiles (low/medium/high/ultra)
+- ✅ Support for RTSP, NDI, HTTP camera sources
+- ✅ Real-time stream statistics and monitoring
+- ✅ Automatic fallback (OBS → native RTMP)
+
+**Important Notes:**
+- FFmpeg must be installed on the server (required for native encoding)
+- Stream keys should never be exposed in client-side code
+- Use 2-3x stream bitrate for network bandwidth to ensure stability
+- OBS integration recommended for professional multi-camera productions
+
+See [PROFESSIONAL_STREAMING.md](PROFESSIONAL_STREAMING.md) for complete setup and troubleshooting.
+
 ## PWA Installation
 
 - Open the app in Chrome or Edge on laptop/tablet
@@ -67,4 +122,6 @@ npm run dev
 
 - WebRTC signaling is proxied through Socket.io in this scaffold
 - For production, lock down socket origins and use SSL certificates
-- Add real RTMP encoder integration for Facebook Live in the `LivestreamStudioPanel` workflow
+- RTMP streaming requires FFmpeg to be installed on the server
+- Stream keys should never be exposed in client-side code or logs
+
