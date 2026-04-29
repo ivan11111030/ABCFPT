@@ -1,23 +1,32 @@
 import { io, Socket } from "socket.io-client";
+import { getSocketServerUrl } from "@/src/lib/realtimeConfig";
 
 let socket: Socket | null = null;
 
-export const createSocketClient = () => {
+export const createSocketClient = (): Socket => {
   if (socket) {
     return socket;
   }
 
-  const socketUrl = typeof window !== "undefined" 
-    ? (window as any).NEXT_PUBLIC_SOCKET_SERVER_URL || "http://localhost:4000"
-    : "http://localhost:4000";
+  if (typeof window === "undefined") {
+    // Return a stub during SSR to avoid connection attempts
+    return {
+      on: () => {},
+      off: () => {},
+      emit: () => {},
+      connect: () => {},
+      disconnect: () => {},
+      connected: false,
+    } as unknown as Socket;
+  }
 
-  socket = io(socketUrl, {
-    transports: ["websocket", "polling"],
+  socket = io(getSocketServerUrl(), {
+    transports: ["websocket"],
+    autoConnect: true,
     reconnection: true,
+    reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
-    reconnectionAttempts: 5,
-    autoConnect: true,
   });
 
   return socket;

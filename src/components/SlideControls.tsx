@@ -14,7 +14,7 @@ export function SlideControls({ onPrevious, onNext, onJump }: SlideControlsProps
       </div>
       <div className="control-row">
         <button type="button" className="button outline" onClick={onPrevious}>
-          Previous Slide
+          Prev Slide
         </button>
         <button type="button" className="button primary" onClick={onNext}>
           Next Slide
@@ -23,7 +23,7 @@ export function SlideControls({ onPrevious, onNext, onJump }: SlideControlsProps
       <div className="jump-grid">
         {sections.map((section, index) => (
           <button key={section} type="button" className="button subtle" onClick={() => onJump(index)}>
-            Jump to {section}
+            {section}
           </button>
         ))}
       </div>

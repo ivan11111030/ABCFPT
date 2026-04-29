@@ -2,23 +2,14 @@ services:
   - type: web
     name: abcfpt-socket
     runtime: node
-    buildCommand: npm install
-    startCommand: npm run dev:server
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: PORT
-        value: 4000
     plan: free
-    region: oregon
-
-  - type: static
-    name: abcfpt-web
-    staticPublishPath: ./out
-    buildCommand: npm install && npm run build
+    buildCommand: apt-get update && apt-get install -y --no-install-recommends ffmpeg && npm install
+    startCommand: npm run server:start
+    healthCheckPath: /status
     envVars:
-      - key: SOCKET_SERVER_URL
-        fromService:
-          name: abcfpt-socket
-          type: web
-          property: url
+      - key: NODE_VERSION
+        value: 20
+      - key: PUBLIC_HOST
+        sync: false
+      - key: CLIENT_ORIGIN
+        value: https://ivan11111030.github.io

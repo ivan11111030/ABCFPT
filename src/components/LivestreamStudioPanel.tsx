@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Camera, CameraTransition, SceneMode } from "@/src/types/production";
 
 type LivestreamStudioPanelProps = {
@@ -5,6 +6,7 @@ type LivestreamStudioPanelProps = {
   activeCamera: Camera;
   transition: CameraTransition;
   isLive: boolean;
+  streamStatus?: string;
   onStart: () => void;
   onStop: () => void;
   onToggleOverlay: () => void;
@@ -17,17 +19,23 @@ export function LivestreamStudioPanel({
   activeCamera,
   transition,
   isLive,
+  streamStatus,
   onStart,
   onStop,
   onToggleOverlay,
   onChangeRtmpUrl,
   onChangeStreamKey,
 }: LivestreamStudioPanelProps) {
+  const [rtmpUrl, setRtmpUrl] = useState("rtmp://live-api.facebook.com:80/rtmp/");
+  const [streamKey, setStreamKey] = useState("");
+
   return (
     <section className="studio-panel">
       <div className="panel-header">
         <p>Livestream Studio</p>
-        <p>{isLive ? "Live" : "Standby"}</p>
+        <span style={{ fontSize: 12, fontWeight: 700, color: isLive ? "var(--danger)" : "var(--muted)" }}>
+          {isLive ? "🔴 LIVE" : "⏸ Standby"}
+        </span>
       </div>
       <div className="studio-line">
         <span>Scene</span>
@@ -44,24 +52,66 @@ export function LivestreamStudioPanel({
       <div className="studio-input-group">
         <label>
           Facebook RTMP URL
-          <input type="text" placeholder="rtmp://live-api.facebook.com:80/rtmp/" onChange={(event) => onChangeRtmpUrl(event.target.value)} />
+          <input
+            type="text"
+            value={rtmpUrl}
+            placeholder="rtmp://live-api.facebook.com:80/rtmp/"
+            onChange={(event) => {
+              setRtmpUrl(event.target.value);
+              onChangeRtmpUrl(event.target.value);
+            }}
+          />
         </label>
         <label>
           Stream Key
-          <input type="text" placeholder="Enter stream key" onChange={(event) => onChangeStreamKey(event.target.value)} />
+          <input
+            type="password"
+            value={streamKey}
+            placeholder="Enter your Facebook stream key"
+            onChange={(event) => {
+              setStreamKey(event.target.value);
+              onChangeStreamKey(event.target.value);
+            }}
+          />
         </label>
       </div>
+      {streamStatus && (
+        <div style={{
+          padding: "8px 12px",
+          borderRadius: 8,
+          marginBottom: 8,
+          fontSize: 13,
+          background: streamStatus.toLowerCase().includes("error") ? "var(--danger)" : streamStatus === "Live" ? "var(--success)" : streamStatus === "Connecting..." ? "#f59e0b" : "var(--card)",
+          color: streamStatus.toLowerCase().includes("error") || streamStatus === "Live" || streamStatus === "Connecting..." ? "#fff" : "var(--text)",
+        }}>
+          {streamStatus}
+        </div>
+      )}
       <div className="studio-control-row">
-        <button type="button" className="button primary" onClick={onStart}>
-          Start Stream
-        </button>
-        <button type="button" className="button outline" onClick={onStop}>
-          Stop Stream
-        </button>
+        {!isLive ? (
+          <button
+            type="button"
+            className="button broadcast"
+            onClick={onStart}
+            disabled={!streamKey.trim()}
+            style={{ flex: 1 }}
+          >
+            🔴 Start Stream
+          </button>
+        ) : (
+          <button type="button" className="button danger" onClick={onStop} style={{ flex: 1 }}>
+            ⏹ Stop Stream
+          </button>
+        )}
       </div>
-      <button type="button" className="button subtle" onClick={onToggleOverlay}>
+      <button type="button" className="button subtle" onClick={onToggleOverlay} style={{ width: "100%" }}>
         Toggle Lyrics Overlay
       </button>
+      {!streamKey.trim() && (
+        <p style={{ fontSize: 11, color: "var(--muted)", textAlign: "center", marginTop: 6 }}>
+          Enter your stream key to enable streaming. Get it from Facebook Live Producer.
+        </p>
+      )}
     </section>
   );
 }

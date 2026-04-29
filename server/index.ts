@@ -1,272 +1,570 @@
 import express, { type Request, type Response } from "express";
 import http from "http";
+import fs from "fs";
+import path from "path";
+import { spawn, type ChildProcess } from "child_process";
 import { Server, type Socket } from "socket.io";
-import { startRtmpStream, stopRtmpStream, getStreamStatus, stopAllStreams, getStreamStats, getActiveStreamsWithStats, ENCODING_PROFILES, type CameraSource } from "./rtmp-encoder";
-import { OBSController, type StreamSettings } from "./obs-controller";
-import { getCameraById, getAllCameras } from "./camera-sources";
 
 const app = express();
 const port = Number(process.env.PORT) || 4000;
+const publicHost = process.env.PUBLIC_HOST || `http://localhost:${port}`;
+const corsOrigins = (process.env.CLIENT_ORIGIN || "*")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 const server = http.createServer(app);
+const socketCameraMap = new Map<string, string>();
 
-// OBS WebSocket Controller
-const obsController = new OBSController(
-  process.env.OBS_HOST || "localhost",
-  Number(process.env.OBS_PORT) || 4444,
-  process.env.OBS_PASSWORD || ""
-);
+/* ── Types ──────────────────────────────────────────── */
+type SceneMode = "worship" | "speaker" | "announcement" | "lyrics";
+type CameraTransition = "cut" | "fade" | "cross-dissolve";
+type OverlayPosition = { x: number; y: number; width: number };
 
-// Auto-connect to OBS on startup
-(async () => {
-  const connected = await obsController.connect();
-  if (connected) {
-    console.log("[Server] OBS Studio connected");
-  } else {
-    console.log("[Server] OBS Studio not available (running in native RTMP mode)");
-  }
-})();
-
-type StreamActionPayload = {
-  rtmpUrl?: string;
-  streamKey?: string;
-  scene?: string;
-  cameraId?: string;
-  profile?: "high" | "medium" | "low" | "ultra";
-  useOBS?: boolean;
+type Slide = { id: string; section: string; text: string; notes?: string; background?: string };
+type Song = {
+  id: string; title: string; artist: string; key: string;
+  tempo: number; currentSection: string; slides: Slide[]; favorite: boolean;
+  updatedAt?: number;
+};
+type Camera = {
+  id: string; name: string; protocol: string; ipAddress: string;
+  streamUrl: string; status: string; supportsPTZ: boolean;
+  enabled?: boolean; isMobile?: boolean; signalStrength?: string; presetList?: string[];
 };
 
-type MobileCameraPayload = {
-  device: string;
-  supportedResolutions: string[];
-};
+/* ── Shared in-memory state ─────────────────────────── */
 
-type AudioStatusPayload = {
-  source: string;
-  levelLeft: number;
-  levelRight: number;
-  peak: boolean;
-  bpm: number;
-};
-
-const sampleCameras = [
-  { id: "camera-01", name: "Stage Wide Camera", protocol: "RTSP", ipAddress: "192.168.1.101", streamUrl: "rtsp://192.168.1.101/live", status: "online", supportsPTZ: false, signalStrength: "good" },
-  { id: "camera-02", name: "Lead Singer Close", protocol: "NDI", ipAddress: "192.168.1.102", streamUrl: "ndi://lead-singer", status: "online", supportsPTZ: true, signalStrength: "good" },
-  { id: "camera-phone-1", name: "Phone Camera 1", protocol: "WebRTC", ipAddress: "192.168.1.201", streamUrl: "webrtc://192.168.1.201/offer", status: "online", supportsPTZ: false, isMobile: true, enabled: true, signalStrength: "good" },
+const defaultSongs: Song[] = [
+  {
+    id: "song-001", title: "Abide in the Light", artist: "ABCF Worship",
+    key: "C", tempo: 78, currentSection: "Verse 1", favorite: true,
+    slides: [
+      { id: "slide-001", section: "Verse 1", text: "Abide in the light, we will sing tonight." },
+      { id: "slide-002", section: "Chorus", text: "Let every heart proclaim Your name." },
+      { id: "slide-003", section: "Bridge", text: "Spirit move and stir our praise." },
+    ],
+  },
+  {
+    id: "song-002", title: "Grace Like Rain", artist: "ABCF Worship",
+    key: "G", tempo: 92, currentSection: "Chorus", favorite: false,
+    slides: [
+      { id: "slide-004", section: "Verse 1", text: "Falling like rain, Your love comes down." },
+      { id: "slide-005", section: "Chorus", text: "Grace like rain, Holy Fire." },
+      { id: "slide-006", section: "Tag", text: "We stand in awe of who You are." },
+    ],
+  },
 ];
+
+/* ── Persistent song file on disk ───────────────────── */
+const CLOUD_SONGS_PATH = path.join(__dirname, "cloud_songs.json");
+
+type CloudData = {
+  songs: Song[];
+  uploadedAt: number;
+};
+
+function loadCloudSongs(): CloudData {
+  try {
+    if (fs.existsSync(CLOUD_SONGS_PATH)) {
+      const raw = fs.readFileSync(CLOUD_SONGS_PATH, "utf-8");
+      const parsed = JSON.parse(raw) as CloudData;
+      if (Array.isArray(parsed.songs)) return parsed;
+    }
+  } catch (err) {
+    console.error("[Cloud] Failed to read cloud_songs.json:", err);
+  }
+  return { songs: [], uploadedAt: 0 };
+}
+
+function saveCloudSongs(data: CloudData) {
+  try {
+    fs.writeFileSync(CLOUD_SONGS_PATH, JSON.stringify(data, null, 2), "utf-8");
+  } catch (err) {
+    console.error("[Cloud] Failed to write cloud_songs.json:", err);
+  }
+}
+
+// Initialize songs from cloud file if it exists, otherwise use defaults
+const initialCloudData = loadCloudSongs();
+const initialSongs = initialCloudData.songs.length > 0 ? initialCloudData.songs : defaultSongs;
+
+const state = {
+  songs: initialSongs as Song[],
+  currentSongId: initialSongs[0]?.id || "song-001",
+  currentSlide: 0,
+  currentScene: "worship" as SceneMode,
+  cameras: [
+    { id: "camera-01", name: "Stage Wide Camera", protocol: "RTSP", ipAddress: "192.168.1.101", streamUrl: "rtsp://192.168.1.101/live", status: "online", supportsPTZ: false, signalStrength: "good" },
+    { id: "camera-02", name: "Lead Singer Close", protocol: "NDI", ipAddress: "192.168.1.102", streamUrl: "ndi://lead-singer", status: "online", supportsPTZ: true, signalStrength: "good" },
+  ] as Camera[],
+  activeCameraId: "camera-01",
+  cameraTransition: "cut" as CameraTransition,
+  isLive: false,
+  overlayEnabled: true,
+  overlayPosition: { x: 0, y: 75, width: 100 } as OverlayPosition,
+  standby: false,
+  background: { type: "color" as "color" | "image", value: "#000000" },
+  sceneType: "worship" as string,
+  sceneConfig: null as any,
+};
+
+/* ── FFmpeg RTMP streaming ──────────────────────────── */
+let ffmpegProcess: ChildProcess | null = null;
+let streamTargetUrl: string = "";
+
+function stopFfmpeg() {
+  if (ffmpegProcess) {
+    try {
+      ffmpegProcess.stdin?.end();
+      ffmpegProcess.kill("SIGTERM");
+    } catch { /* already dead */ }
+    ffmpegProcess = null;
+  }
+  streamTargetUrl = "";
+}
+
+function startFfmpeg(rtmpUrl: string, streamKey: string): { ok: boolean; error?: string } {
+  stopFfmpeg(); // clean up previous
+
+  const fullUrl = `${rtmpUrl}${streamKey}`;
+  streamTargetUrl = fullUrl;
+
+  // Validate URL format
+  if (!fullUrl.startsWith("rtmp://") && !fullUrl.startsWith("rtmps://")) {
+    return { ok: false, error: "Invalid RTMP URL — must start with rtmp:// or rtmps://" };
+  }
+
+  try {
+    const args = [
+      "-f", "webm",           // input format from MediaRecorder
+      "-i", "pipe:0",         // read from stdin
+      // Video encoding
+      "-c:v", "libx264",
+      "-preset", "veryfast",
+      "-tune", "zerolatency",
+      "-b:v", "2500k",
+      "-maxrate", "2500k",
+      "-bufsize", "5000k",
+      "-pix_fmt", "yuv420p",
+      "-g", "60",             // keyframe every 2s at 30fps
+      "-r", "30",
+      // Audio encoding
+      "-c:a", "aac",
+      "-b:a", "128k",
+      "-ar", "44100",
+      // Output
+      "-f", "flv",
+      "-flvflags", "no_duration_filesize",
+      fullUrl,
+    ];
+
+    ffmpegProcess = spawn("ffmpeg", args, { stdio: ["pipe", "pipe", "pipe"] });
+
+    ffmpegProcess.stderr?.on("data", (data: Buffer) => {
+      const msg = data.toString();
+      // Only log meaningful lines (skip progress spam)
+      if (msg.includes("Error") || msg.includes("error") || msg.includes("failed") || msg.includes("Opening") || msg.includes("Output")) {
+        console.log(`[FFmpeg] ${msg.trim()}`);
+      }
+    });
+
+    ffmpegProcess.on("error", (err) => {
+      console.error("[FFmpeg] Process error:", err.message);
+      state.isLive = false;
+      io.emit("stream:error", { message: `FFmpeg error: ${err.message}` });
+      io.emit("stream:stopped", { status: "stopped" });
+      ffmpegProcess = null;
+    });
+
+    ffmpegProcess.on("close", (code) => {
+      console.log(`[FFmpeg] Process exited with code ${code}`);
+      if (state.isLive) {
+        state.isLive = false;
+        if (code !== 0) {
+          io.emit("stream:error", { message: `Stream ended unexpectedly (code ${code})` });
+        }
+        io.emit("stream:stopped", { status: "stopped" });
+      }
+      ffmpegProcess = null;
+    });
+
+    console.log(`[FFmpeg] Started → ${fullUrl}`);
+    return { ok: true };
+  } catch (err: any) {
+    console.error("[FFmpeg] Failed to spawn:", err);
+    return { ok: false, error: err.message || "Failed to start ffmpeg" };
+  }
+}
+
+/* ── Socket.io ──────────────────────────────────────── */
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: corsOrigins.length === 1 && corsOrigins[0] === "*" ? "*" : corsOrigins,
     methods: ["GET", "POST"],
   },
+  maxHttpBufferSize: 5e6, // 5MB for video chunks
+});
+
+app.use((req: Request, res: Response, next) => {
+  const requestOrigin = req.headers.origin;
+  const allowAllOrigins = corsOrigins.length === 1 && corsOrigins[0] === "*";
+
+  if (allowAllOrigins) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+  } else if (requestOrigin && corsOrigins.includes(requestOrigin)) {
+    // Reflect allowed origins so browser preflight succeeds for configured clients.
+    res.setHeader("Access-Control-Allow-Origin", requestOrigin);
+    res.setHeader("Vary", "Origin");
+  }
+
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  if (req.method === "OPTIONS") {
+    res.status(204).end();
+    return;
+  }
+
+  next();
+});
+
+app.use(express.json({ limit: "5mb" }));
+
+app.get("/", (_req: Request, res: Response) => {
+  res.json({ service: "abcfpt-socket", status: "ok", timestamp: Date.now() });
 });
 
 app.get("/status", (_req: Request, res: Response) => {
-  res.json({
-    status: "ok",
-    timestamp: Date.now(),
-    obs: {
-      connected: obsController.isConnected(),
-    },
-    streams: getActiveStreamsWithStats(),
-    cameras: getAllCameras(),
-    encodingProfiles: Object.values(ENCODING_PROFILES),
-  });
+  res.json({ status: "ok", timestamp: Date.now() });
 });
 
-// Endpoint to get camera list
-app.get("/cameras", (_req: Request, res: Response) => {
-  res.json({ cameras: getAllCameras() });
+/* ── Cloud song sync REST API ───────────────────────── */
+
+/**
+ * POST /api/songs/upload
+ * Body: { songs: Song[], uploadedAt: number }
+ *
+ * Replaces the cloud setlist with the uploaded version.
+ * Also updates the in-memory state so all connected clients sync.
+ */
+app.post("/api/songs/upload", (req: Request, res: Response) => {
+  try {
+    const body = req.body as { songs?: Song[]; uploadedAt?: number };
+    if (!body.songs || !Array.isArray(body.songs)) {
+      res.status(400).json({ error: "songs array is required" });
+      return;
+    }
+
+    const uploadedAt = body.uploadedAt ?? Date.now();
+    const cloudData: CloudData = { songs: body.songs, uploadedAt };
+    saveCloudSongs(cloudData);
+
+    // Also update in-memory state for real-time clients
+    state.songs = body.songs;
+    io.emit("song:list", state.songs);
+
+    console.log(`[Cloud] Uploaded ${body.songs.length} song(s) at ${new Date(uploadedAt).toISOString()}`);
+    res.json({ ok: true, count: body.songs.length, uploadedAt });
+  } catch (err: any) {
+    console.error("[Cloud] Upload error:", err);
+    res.status(500).json({ error: err?.message || "Internal server error" });
+  }
 });
 
-// Endpoint to get stream stats
-app.get("/streams", (_req: Request, res: Response) => {
-  res.json({ streams: getActiveStreamsWithStats() });
+/**
+ * GET /api/songs/download?since=<timestamp>
+ *
+ * Returns songs from the cloud setlist.
+ * If `since` param > 0, only returns songs with updatedAt >= since.
+ * If `since` is 0 or missing, returns all songs.
+ */
+app.get("/api/songs/download", (req: Request, res: Response) => {
+  try {
+    const since = Number(req.query.since) || 0;
+    const cloudData = loadCloudSongs();
+
+    let songsToReturn: Song[];
+    if (since > 0) {
+      songsToReturn = cloudData.songs.filter((s) => (s.updatedAt ?? 0) >= since);
+    } else {
+      songsToReturn = cloudData.songs;
+    }
+
+    console.log(`[Cloud] Download request (since=${since}): returning ${songsToReturn.length}/${cloudData.songs.length} song(s)`);
+    res.json({
+      songs: songsToReturn,
+      totalOnServer: cloudData.songs.length,
+      serverTimestamp: cloudData.uploadedAt || Date.now(),
+    });
+  } catch (err: any) {
+    console.error("[Cloud] Download error:", err);
+    res.status(500).json({ error: err?.message || "Internal server error" });
+  }
 });
 
 io.on("connection", (socket: Socket) => {
   console.log(`Socket connected: ${socket.id}`);
-  socket.emit("device:update", { status: "ready" });
-  socket.emit("camera:list", sampleCameras);
 
-  socket.on("control:scene", (scene: { scene: string; cameraId: string; transition: string }) => {
-    io.emit("control:scene", scene);
-  });
+  // Push full current state to newly connected client
+  socket.emit("state:sync", state);
 
+  /* ── Control events (io.emit so ALL clients sync) ── */
   socket.on("control:slide", (slideIndex: number) => {
+    state.currentSlide = slideIndex;
     io.emit("control:slide", slideIndex);
   });
 
   socket.on("control:song", (songId: string) => {
+    state.currentSongId = songId;
+    state.currentSlide = 0;
     io.emit("control:song", songId);
+    io.emit("control:slide", 0);
+  });
+
+  socket.on("control:scene", (payload: { scene: string; cameraId: string; transition: string; sceneType?: string; sceneConfig?: any } | string) => {
+    const scene = (typeof payload === "string" ? payload : payload.scene) as SceneMode;
+    state.currentScene = scene;
+    if (typeof payload !== "string") {
+      if (payload.sceneType) state.sceneType = payload.sceneType;
+      if (payload.sceneConfig) state.sceneConfig = payload.sceneConfig;
+    }
+    io.emit("control:scene", typeof payload === "string" ? { scene } : payload);
   });
 
   socket.on("control:camera", (cameraId: string) => {
+    state.activeCameraId = cameraId;
     io.emit("control:camera", cameraId);
   });
 
   socket.on("control:camera:transition", (transition: string) => {
+    state.cameraTransition = transition as CameraTransition;
     io.emit("control:camera:transition", transition);
   });
 
-  socket.on("mobile-camera:join", (mobileCameraData: MobileCameraPayload) => {
-    io.emit("mobile-camera:joined", mobileCameraData);
+  /* ── Song CRUD ───────────────────────────────────── */
+  socket.on("song:add", (song: Song) => {
+    state.songs.push(song);
+    io.emit("song:list", state.songs);
   });
 
-  socket.on("mobile-camera:offer", (offer: RTCSessionDescriptionInit) => {
-    io.emit("mobile-camera:offer", offer);
+  socket.on("song:update", (song: Song) => {
+    const idx = state.songs.findIndex((s) => s.id === song.id);
+    if (idx >= 0) state.songs[idx] = song;
+    io.emit("song:list", state.songs);
   });
 
-  socket.on("mobile-camera:answer", (answer: RTCSessionDescriptionInit) => {
-    io.emit("mobile-camera:answer", answer);
+  socket.on("song:delete", (songId: string) => {
+    state.songs = state.songs.filter((s) => s.id !== songId);
+    if (state.currentSongId === songId && state.songs.length > 0) {
+      state.currentSongId = state.songs[0].id;
+      state.currentSlide = 0;
+      io.emit("control:song", state.currentSongId);
+      io.emit("control:slide", 0);
+    }
+    io.emit("song:list", state.songs);
   });
 
-  socket.on("mobile-camera:candidate", (candidate: RTCIceCandidateInit) => {
-    io.emit("mobile-camera:candidate", candidate);
+  socket.on("song:import", (songs: Song[]) => {
+    for (const song of songs) {
+      if (!state.songs.some((s) => s.id === song.id)) {
+        state.songs.push(song);
+      }
+    }
+    io.emit("song:list", state.songs);
   });
 
-  socket.on("mobile-camera:status", (status: { enabled: boolean; signalStrength: string }) => {
-    io.emit("mobile-camera:status", status);
+  socket.on("song:reorder", (songIds: string[]) => {
+    const reordered: Song[] = [];
+    for (const id of songIds) {
+      const song = state.songs.find((s) => s.id === id);
+      if (song) reordered.push(song);
+    }
+    for (const song of state.songs) {
+      if (!reordered.some((s) => s.id === song.id)) reordered.push(song);
+    }
+    state.songs = reordered;
+    io.emit("song:list", state.songs);
   });
 
-  socket.on("stream:start", async (payload: StreamActionPayload) => {
+  /* ── Camera events ───────────────────────────────── */
+  socket.on("camera:add", (camera: Camera) => {
+    if (camera.isMobile) {
+      socketCameraMap.set(socket.id, camera.id);
+    }
+
+    if (!state.cameras.some((c) => c.id === camera.id)) {
+      state.cameras.push({ ...camera, status: "online" });
+    } else {
+      const idx = state.cameras.findIndex((c) => c.id === camera.id);
+      if (idx >= 0) state.cameras[idx] = { ...state.cameras[idx], ...camera, status: "online" };
+    }
+    io.emit("camera:list", state.cameras);
+  });
+
+  socket.on("camera:remove", (cameraId: string) => {
+    state.cameras = state.cameras.filter((c) => c.id !== cameraId);
+    if (socketCameraMap.get(socket.id) === cameraId) {
+      socketCameraMap.delete(socket.id);
+    }
+    io.emit("camera:list", state.cameras);
+  });
+
+  /* ── Mobile camera signaling ─────────────────────── */
+  socket.on("mobile-camera:join", (data: { cameraId?: string; cameraName?: string; device?: string }) => {
+    const cam: Camera = {
+      id: data.cameraId || `mobile-${Date.now()}`,
+      name: data.cameraName || "Mobile Camera",
+      protocol: "WebRTC",
+      ipAddress: "",
+      streamUrl: "webrtc://mobile",
+      status: "online",
+      supportsPTZ: false,
+      isMobile: true,
+      enabled: true,
+      signalStrength: "good",
+    };
+    socketCameraMap.set(socket.id, cam.id);
+
+    if (!state.cameras.some((c) => c.id === cam.id)) {
+      state.cameras.push(cam);
+    } else {
+      const idx = state.cameras.findIndex((c) => c.id === cam.id);
+      if (idx >= 0) state.cameras[idx] = { ...state.cameras[idx], status: "online" };
+    }
+    io.emit("camera:list", state.cameras);
+    socket.broadcast.emit("mobile-camera:joined", data);
+  });
+
+  socket.on("mobile-camera:offer", (payload: Record<string, unknown>) => {
+    socket.broadcast.emit("mobile-camera:offer", payload);
+  });
+
+  socket.on("mobile-camera:answer", (payload: Record<string, unknown>) => {
+    socket.broadcast.emit("mobile-camera:answer", payload);
+  });
+
+  socket.on("mobile-camera:candidate", (payload: Record<string, unknown>) => {
+    socket.broadcast.emit("mobile-camera:candidate", payload);
+  });
+
+  socket.on("mobile-camera:status", (status: Record<string, unknown>) => {
+    socket.broadcast.emit("mobile-camera:status", status);
+  });
+
+  // Snapshot fallback: relay camera frames through the socket server
+  socket.on("mobile-camera:snapshot", (payload: { cameraId: string; frame: string }) => {
+    socket.broadcast.emit("mobile-camera:snapshot", payload);
+  });
+
+  /* ── Stream events ───────────────────────────────── */
+  socket.on("stream:start", (payload: { rtmpUrl?: string; streamKey?: string; scene?: string; cameraId?: string }) => {
+    if (!payload.rtmpUrl || !payload.streamKey) {
+      socket.emit("stream:error", { message: "RTMP URL and Stream Key are required." });
+      return;
+    }
+
+    const result = startFfmpeg(payload.rtmpUrl, payload.streamKey);
+    if (!result.ok) {
+      socket.emit("stream:error", { message: result.error || "Failed to start stream" });
+      return;
+    }
+
+    state.isLive = true;
+    console.log(`[Stream] Live → ${payload.rtmpUrl}***`);
+    io.emit("stream:started", { scene: payload.scene, cameraId: payload.cameraId, status: "live" });
+  });
+
+  // Binary video data from client MediaRecorder
+  socket.on("stream:data", (chunk: Buffer | ArrayBuffer) => {
+    if (!ffmpegProcess || !ffmpegProcess.stdin?.writable) return;
     try {
-      const streamId = `stream-${socket.id}`;
-      
-      if (!payload.rtmpUrl || !payload.streamKey) {
-        socket.emit("stream:error", { error: "Missing RTMP URL or stream key" });
-        return;
-      }
-
-      // Try OBS first if available and requested
-      if (payload.useOBS && obsController.isConnected()) {
-        console.log(`[Stream] Starting OBS stream for ${socket.id}`);
-        
-        const obsSettings: StreamSettings = {
-          server: payload.rtmpUrl,
-          key: payload.streamKey,
-          bitrate: 5000,
-          fps: 30,
-        };
-
-        const started = await obsController.startStreaming(obsSettings);
-        if (started) {
-          io.emit("stream:started", {
-            ...payload,
-            streamId,
-            status: "active",
-            method: "OBS",
-          });
-          return;
-        }
-      }
-
-      // Fall back to native RTMP encoding
-      console.log(`[Stream] Starting native RTMP stream for ${socket.id}`);
-      
-      const profile = payload.profile ? ENCODING_PROFILES[payload.profile] : ENCODING_PROFILES.medium;
-      
-      // Get camera source if specified
-      let cameraSource: CameraSource | undefined;
-      if (payload.cameraId) {
-        const camera = getCameraById(payload.cameraId);
-        if (camera) {
-          cameraSource = {
-            id: camera.id,
-            url: camera.url,
-            protocol: camera.protocol as any,
-            username: camera.username,
-            password: camera.password,
-          };
-        }
-      }
-
-      await startRtmpStream(streamId, {
-        rtmpUrl: payload.rtmpUrl,
-        streamKey: payload.streamKey,
-        cameraSource,
-        profile,
-      });
-
-      io.emit("stream:started", {
-        ...payload,
-        streamId,
-        status: "active",
-        method: "RTMP-Native",
-        profile: profile.name,
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      console.error(`[Stream] Failed to start stream:`, errorMessage);
-      socket.emit("stream:error", { error: errorMessage });
-      io.emit("stream:failed", { payload, error: errorMessage });
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      ffmpegProcess.stdin.write(buf);
+    } catch (err: any) {
+      console.error("[Stream] Error writing to ffmpeg:", err.message);
     }
   });
 
-  socket.on("stream:stop", (payload: StreamActionPayload) => {
-    const streamId = `stream-${socket.id}`;
-    
-    // Try OBS first
-    if (obsController.isConnected()) {
-      obsController.stopStreaming().catch((err) => {
-        console.error("[Stream] Failed to stop OBS stream:", err);
-      });
-    }
-
-    // Stop native RTMP
-    stopRtmpStream(streamId);
-    
-    io.emit("stream:stopped", { ...payload, streamId, status: "inactive" });
-  });
-
-  socket.on("stream:status", (callback: (status: any) => void) => {
-    const streamId = `stream-${socket.id}`;
-    const stats = getStreamStats(streamId);
-    callback({
-      status: getStreamStatus(streamId),
-      stats,
-      obsConnected: obsController.isConnected(),
-    });
+  socket.on("stream:stop", () => {
+    stopFfmpeg();
+    state.isLive = false;
+    console.log("[Stream] Stream stopped");
+    io.emit("stream:stopped", { status: "stopped" });
   });
 
   socket.on("stream:toggleOverlay", (payload: { enabled: boolean }) => {
+    state.overlayEnabled = payload.enabled;
     io.emit("stream:overlayToggled", payload);
   });
 
-  socket.on("camera:add", (camera: Record<string, unknown>) => {
-    io.emit("camera:added", camera);
+  socket.on("stream:overlayPosition", (pos: OverlayPosition) => {
+    state.overlayPosition = pos;
+    io.emit("stream:overlayPosition", pos);
   });
 
-  socket.on("song:import", (songPayload: Record<string, unknown>) => {
-    io.emit("song:imported", songPayload);
+  socket.on("stream:overlayOpacity", (opacity: number) => {
+    (state as any).overlayOpacity = opacity;
+    io.emit("stream:overlayOpacity", opacity);
   });
 
-  socket.on("camera:discover", (discoveryPayload: Record<string, unknown>) => {
-    io.emit("camera:discover", discoveryPayload);
+  socket.on("stream:overlayHeight", (height: number) => {
+    (state as any).overlayHeight = height;
+    io.emit("stream:overlayHeight", height);
   });
 
-  socket.on("teleprompter:request", (payload: Record<string, unknown>) => {
-    io.emit("teleprompter:update", payload);
+  socket.on("stream:canvaOverlay", (imageUrl: string | null) => {
+    (state as any).canvaOverlayImage = imageUrl;
+    io.emit("stream:canvaOverlay", imageUrl);
   });
 
-  socket.on("audio:status", (audioStatus: AudioStatusPayload) => {
+  /* ── Standby & Background ────────────────────────── */
+  socket.on("control:standby", (enabled: boolean) => {
+    state.standby = enabled;
+    io.emit("control:standby", enabled);
+  });
+
+  socket.on("control:background", (bg: { type: string; value: string }) => {
+    state.background = bg as typeof state.background;
+    io.emit("control:background", bg);
+  });
+
+  /* ── Discovery ───────────────────────────────────── */
+  socket.on("camera:discover", (payload: Record<string, unknown>) => {
+    socket.broadcast.emit("camera:discover", payload);
+  });
+
+  /* ── Audio ───────────────────────────────────────── */
+  socket.on("audio:status", (audioStatus: Record<string, unknown>) => {
     io.emit("audio:status", audioStatus);
   });
 
+  /* ── Teleprompter state request ──────────────────── */
+  socket.on("teleprompter:request", () => {
+    socket.emit("state:sync", state);
+  });
+
   socket.on("disconnect", () => {
+    const mobileCameraId = socketCameraMap.get(socket.id);
+
+    if (mobileCameraId) {
+      state.cameras = state.cameras.filter((camera) => camera.id !== mobileCameraId);
+      socketCameraMap.delete(socket.id);
+      io.emit("camera:list", state.cameras);
+    }
+
+    // If the disconnecting client was streaming, stop ffmpeg
+    if (state.isLive && ffmpegProcess) {
+      console.log("[Stream] Streaming client disconnected, stopping ffmpeg");
+      stopFfmpeg();
+      state.isLive = false;
+      io.emit("stream:stopped", { status: "stopped" });
+    }
+
     console.log(`Socket disconnected: ${socket.id}`);
-    // Stop any active streams for this socket
-    const streamId = `stream-${socket.id}`;
-    stopRtmpStream(streamId);
   });
 });
 
-// Cleanup streams on server shutdown
-process.on("SIGTERM", () => {
-  console.log("[Server] Received SIGTERM, shutting down gracefully");
-  stopAllStreams();
-  server.close();
-});
-
-server.listen(port, "0.0.0.0", () => {
-  console.log(`Socket server is running on port ${port}`);
+server.listen(port, () => {
+  console.log(`Socket server is running on ${publicHost}`);
+  console.log(`Socket CORS origin(s): ${corsOrigins.join(", ")}`);
 });

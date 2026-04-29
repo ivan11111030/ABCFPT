@@ -78,6 +78,9 @@ web_modules/
 .next
 out
 
+# Cloud song data (server-side persistent storage)
+server/cloud_songs.json
+
 # Nuxt.js build / generate output
 .nuxt
 dist

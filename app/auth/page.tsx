@@ -7,11 +7,14 @@ import {
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
   GoogleAuthProvider,
   signOut,
 } from "firebase/auth";
 import { auth } from "@/src/lib/firebase";
 import { useAuth } from "@/src/lib/useAuth";
+
+const BASE = process.env.NEXT_PUBLIC_BASE_PATH || "/ABCFPT";
 
 export default function AuthPage() {
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -21,6 +24,8 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const user = useAuth();
   const router = useRouter();
+
+  const isSubmitDisabled = loading || !email.trim() || !password.trim();
 
   useEffect(() => {
     if (user) {
@@ -53,7 +58,21 @@ export default function AuthPage() {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
     } catch (error: unknown) {
-      setMessage((error as Error).message || "Google sign-in failed.");
+      const firebaseError = error as { code?: string; message?: string };
+      if (firebaseError.code === "auth/popup-blocked" || firebaseError.code === "auth/popup-closed-by-user") {
+        try {
+          const provider = new GoogleAuthProvider();
+          await signInWithRedirect(auth, provider);
+          return;
+        } catch (redirectError: unknown) {
+          setMessage((redirectError as Error).message || "Google sign-in failed.");
+          setLoading(false);
+          return;
+        }
+      }
+
+      setMessage(firebaseError.message || "Google sign-in failed.");
+      setLoading(false);
     }
 
     setLoading(false);
@@ -80,33 +99,66 @@ export default function AuthPage() {
   return (
     <main className="auth-shell">
       <section className="auth-card">
-        <div className="logo-row">
-          <div className="logo-box">
-            <img src="/logo-left.svg" alt="ABCF logo left" />
+        <header className="auth-brand-row">
+          <div className="logo-row" aria-label="ABCF brand mark">
+            <img
+              className="logo-img logo-img-square"
+              src={`${BASE}/logo-left.png`}
+              alt="ABCF Church logo"
+              width={120}
+              height={120}
+            />
+            <img
+              className="logo-img logo-img-wide"
+              src={`${BASE}/logo-right.png`}
+              alt="ABCF Production Team logo"
+              width={180}
+              height={120}
+            />
           </div>
-          <div className="logo-box">
-            <img src="/logo-right.svg" alt="ABCF logo right" />
+          <div className="auth-title-block">
+            <h1>{mode === "login" ? "Welcome Back" : "Create Your Account"}</h1>
+            <p>Manage your livestream scenes, lyrics, and camera routing.</p>
           </div>
-        </div>
+        </header>
+
         <div className="panel-header">
-          <p>{mode === "login" ? "Sign In" : "Create Account"}</p>
+          <p>{mode === "login" ? "Sign In" : "Register"}</p>
           <button type="button" className="button subtle" onClick={() => setMode(mode === "login" ? "register" : "login")}> 
             {mode === "login" ? "Create account" : "Sign in"}
           </button>
         </div>
 
-        <div className="auth-form">
+        <form className="auth-form" onSubmit={(event) => {
+          event.preventDefault();
+          void handleAuth();
+        }}>
           <label>
             Email
-            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" />
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="you@example.com"
+              autoComplete="email"
+              required
+            />
           </label>
           <label>
             Password
-            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" />
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Password"
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              minLength={6}
+              required
+            />
           </label>
           <div className="auth-actions">
-            <button type="button" className="button primary" onClick={handleAuth} disabled={loading}>
-              {mode === "login" ? "Sign In" : "Register"}
+            <button type="submit" className="button primary" disabled={isSubmitDisabled}>
+              {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Register"}
             </button>
             {mode === "login" && (
               <button type="button" className="button subtle" onClick={handleResetPassword} disabled={loading}>
@@ -115,7 +167,7 @@ export default function AuthPage() {
             )}
           </div>
           <button type="button" className="button secondary" onClick={handleGoogleSignIn} disabled={loading}>
-            Sign in with Google
+            Continue with Google
           </button>
           {message ? <p className="message">{message}</p> : null}
           {user ? (
@@ -126,7 +178,7 @@ export default function AuthPage() {
               </button>
             </div>
           ) : null}
-        </div>
+        </form>
       </section>
     </main>
   );

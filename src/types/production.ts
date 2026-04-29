@@ -1,10 +1,51 @@
 export type SceneMode = "worship" | "speaker" | "announcement" | "lyrics";
 
+/** Reusable text style applied to slide text or scene overlays */
+export type TextStyle = {
+  fontFamily?: string;
+  fontSize?: number;      // px
+  color?: string;         // hex
+  align?: "left" | "center" | "right";
+  bold?: boolean;
+  italic?: boolean;
+};
+
 export type Slide = {
   id: string;
   section: string;
   text: string;
+  notes?: string;
   background?: string;
+  /** Per-slide text style overrides */
+  textStyle?: TextStyle;
+  /** Base64 rendered image of the original PPTX slide (preserves fonts/layout) */
+  renderedImage?: string;
+  /** Raw OOXML for the slide (fonts, animations, transitions) */
+  rawXml?: string;
+  /** Transition metadata extracted from PPTX */
+  transition?: SlideTransition;
+};
+
+export type SlideTransition = {
+  type: string;       // e.g. "fade", "push", "wipe", "split"
+  duration: number;   // milliseconds
+  advanceAfter?: number; // auto-advance ms (0 = manual)
+};
+
+export type BackgroundConfig = {
+  type: "color" | "image" | "animated";
+  value: string;           // hex color, image URL/data-uri, or animation preset name
+  opacity?: number;        // 0-100
+  animationPreset?: string; // for animated backgrounds
+};
+
+export type CanvaDesign = {
+  id: string;
+  title: string;
+  thumbnailUrl: string;
+  exportUrl: string;
+  type: "overlay" | "background";
+  importedAt: number;
 };
 
 export type Song = {
@@ -16,6 +57,7 @@ export type Song = {
   currentSection: string;
   slides: Slide[];
   favorite: boolean;
+  updatedAt?: number;
 };
 
 export type AudioState = {
