@@ -58,6 +58,7 @@ export type Song = {
   slides: Slide[];
   favorite: boolean;
   updatedAt?: number;
+  category?: "song" | "message" | "announcement"; // Default: "song"
 };
 
 export type AudioState = {

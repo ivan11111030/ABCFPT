@@ -17,13 +17,16 @@ export function SetlistPanel({ songs, activeSongId, onSelectSong, onReorder }: S
   const [cloudBusy, setCloudBusy] = useState(false);
   const [cloudMsg, setCloudMsg] = useState("");
 
+  // Filter to only show songs (not messages/announcements) for the setlist
+  const setlistSongs = useMemo(() => songs.filter(s => s.category !== "message" && s.category !== "announcement"), [songs]);
+
   const filteredSongs = useMemo(() => {
-    if (!search.trim()) return songs;
+    if (!search.trim()) return setlistSongs;
     const q = search.toLowerCase();
-    return songs.filter(
+    return setlistSongs.filter(
       (song) => song.title.toLowerCase().includes(q) || song.artist.toLowerCase().includes(q)
     );
-  }, [songs, search]);
+  }, [setlistSongs, search]);
 
   const handleDragStart = (event: DragEvent<HTMLButtonElement>, songId: string) => {
     setDraggedSongId(songId);

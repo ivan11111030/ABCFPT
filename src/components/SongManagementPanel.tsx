@@ -67,6 +67,7 @@ export function SongManagementPanel({ songs, onImportSong, onAddSong, onUpdateSo
   const [searchQuery, setSearchQuery] = useState("");
   const [cloudStatus, setCloudStatus] = useState("");
   const [cloudBusy, setCloudBusy] = useState(false);
+  const [activeTab, setActiveTab] = useState<"song" | "message" | "announcement">("song");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleUploadToCloud = async () => {
@@ -145,6 +146,11 @@ export function SongManagementPanel({ songs, onImportSong, onAddSong, onUpdateSo
   };
 
   const filteredSongs = songs.filter((s) => {
+    // First filter by category/tab
+    const category = s.category ?? "song";
+    if (category !== activeTab) return false;
+    
+    // Then filter by search query
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return s.title.toLowerCase().includes(q) || s.artist.toLowerCase().includes(q) || s.key.toLowerCase().includes(q);
@@ -155,30 +161,43 @@ export function SongManagementPanel({ songs, onImportSong, onAddSong, onUpdateSo
       <h3 style={{ margin: "0 0 12px" }}>{title}</h3>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
         <label style={{ display: "block" }}>
-          <span style={{ fontSize: 12, color: "var(--muted)" }}>Title</span>
-          <input type="text" value={song.title} onChange={(e) => setSong({ ...song, title: e.target.value })}
-            placeholder="Song Title" style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", color: "var(--text)" }} />
-        </label>
-        <label style={{ display: "block" }}>
-          <span style={{ fontSize: 12, color: "var(--muted)" }}>Artist</span>
-          <input type="text" value={song.artist} onChange={(e) => setSong({ ...song, artist: e.target.value })}
-            placeholder="Artist" style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", color: "var(--text)" }} />
-        </label>
-        <label style={{ display: "block" }}>
-          <span style={{ fontSize: 12, color: "var(--muted)" }}>Key</span>
-          <select value={song.key} onChange={(e) => setSong({ ...song, key: e.target.value })}
+          <span style={{ fontSize: 12, color: "var(--muted)" }}>Type</span>
+          <select value={song.category ?? "song"} onChange={(e) => setSong({ ...song, category: e.target.value as "song" | "message" | "announcement" })}
             style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", color: "var(--text)" }}>
-            {["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"].map((k) => <option key={k} value={k}>{k}</option>)}
+            <option value="song">Song</option>
+            <option value="message">Preacher Message</option>
+            <option value="announcement">Announcement</option>
           </select>
         </label>
         <label style={{ display: "block" }}>
-          <span style={{ fontSize: 12, color: "var(--muted)" }}>Tempo (BPM)</span>
-          <input type="number" value={song.tempo || ""} onChange={(e) => setSong({ ...song, tempo: Number(e.target.value) || 0 })}
-            placeholder="120" style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", color: "var(--text)" }} />
+          <span style={{ fontSize: 12, color: "var(--muted)" }}>Title</span>
+          <input type="text" value={song.title} onChange={(e) => setSong({ ...song, title: e.target.value })}
+            placeholder="Title" style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", color: "var(--text)" }} />
         </label>
+        <label style={{ display: "block" }}>
+          <span style={{ fontSize: 12, color: "var(--muted)" }}>Artist / Speaker</span>
+          <input type="text" value={song.artist} onChange={(e) => setSong({ ...song, artist: e.target.value })}
+            placeholder="Artist / Speaker" style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", color: "var(--text)" }} />
+        </label>
+        {(song.category ?? "song") === "song" && (
+          <>
+            <label style={{ display: "block" }}>
+              <span style={{ fontSize: 12, color: "var(--muted)" }}>Key</span>
+              <select value={song.key} onChange={(e) => setSong({ ...song, key: e.target.value })}
+                style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", color: "var(--text)" }}>
+                {["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"].map((k) => <option key={k} value={k}>{k}</option>)}
+              </select>
+            </label>
+            <label style={{ display: "block" }}>
+              <span style={{ fontSize: 12, color: "var(--muted)" }}>Tempo (BPM)</span>
+              <input type="number" value={song.tempo || ""} onChange={(e) => setSong({ ...song, tempo: Number(e.target.value) || 0 })}
+                placeholder="120" style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", color: "var(--text)" }} />
+            </label>
+          </>
+        )}
       </div>
 
-      <h4 style={{ margin: "12px 0 8px", fontSize: 14 }}>Slides ({song.slides.length})</h4>
+      <h4 style={{ margin: "12px 0 8px", fontSize: 14 }}>{(song.category ?? "song") === "song" ? "Lyrics Slides" : "Content Slides"} ({song.slides.length})</h4>
       {song.slides.map((slide, i) => (
         <div key={slide.id} style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 10, padding: "8px", background: "var(--card)", borderRadius: 8, border: "1px solid var(--border)" }}>
           <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
@@ -226,15 +245,40 @@ export function SongManagementPanel({ songs, onImportSong, onAddSong, onUpdateSo
   return (
     <section className="song-panel">
       <div className="panel-header">
-        <p>Song Library</p>
+        <p>Library</p>
         <div style={{ display: "flex", gap: 8 }}>
-          <button type="button" className="button primary" onClick={() => { setShowAddForm(true); setNewSong(emptySong()); }}>
-            + Add Song
+          <button type="button" className="button primary" onClick={() => { setShowAddForm(true); setNewSong({ ...emptySong(), category: activeTab }); }}>
+            + Add {activeTab === "song" ? "Song" : activeTab === "message" ? "Message" : "Announcement"}
           </button>
           <button type="button" className="button outline" onClick={handleImportClick}>
             Import File
           </button>
         </div>
+      </div>
+
+      {/* Category Tabs */}
+      <div style={{ display: "flex", gap: 0, borderBottom: "1px solid var(--border)", marginBottom: 12, paddingBottom: 0 }}>
+        {(["song", "message", "announcement"] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => { setActiveTab(tab); setSearchQuery(""); }}
+            style={{
+              padding: "10px 16px",
+              border: "none",
+              borderBottom: activeTab === tab ? "2px solid var(--accent)" : "1px solid var(--border)",
+              background: "transparent",
+              color: activeTab === tab ? "var(--accent)" : "var(--muted)",
+              cursor: "pointer",
+              fontSize: 13,
+              fontWeight: activeTab === tab ? 600 : 400,
+              textTransform: "capitalize",
+              transition: "all 0.2s ease",
+            }}
+          >
+            {tab === "song" ? "🎵 Songs" : tab === "message" ? "🎤 Messages" : "📢 Announcements"}
+          </button>
+        ))}
       </div>
 
       {/* Cloud Sync Bar */}
@@ -287,18 +331,33 @@ export function SongManagementPanel({ songs, onImportSong, onAddSong, onUpdateSo
       {editingSong && renderSongForm(editingSong, setEditingSong as any, handleSaveEdit, () => setEditingSong(null), `Edit: ${editingSong.title}`)}
 
       <div className="song-search-row">
-        <input type="search" placeholder="Search songs, artists, keys..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+        <input 
+          type="search" 
+          placeholder={
+            activeTab === "song" 
+              ? "Search songs, artists, keys..." 
+              : activeTab === "message"
+              ? "Search preacher messages..."
+              : "Search announcements..."
+          }
+          value={searchQuery} 
+          onChange={(e) => setSearchQuery(e.target.value)} 
+        />
       </div>
       <div className="song-list">
         {filteredSongs.map((song) => (
           <article key={song.id} className="song-card">
             <div>
               <strong>{song.title}</strong>
-              <p>{song.artist} • {song.key} • {song.tempo ? `${song.tempo} BPM` : "No tempo"} • {song.slides.length} slides</p>
+              <p>
+                {song.artist} • {(song.category ?? "song") === "song" ? `${song.key}` : ""}
+                {(song.category ?? "song") === "song" && song.tempo ? ` • ${song.tempo} BPM` : ""}
+                {(song.category ?? "song") === "song" ? ` • ${song.slides.length} slides` : ` • ${song.slides.length} content items`}
+              </p>
             </div>
             <div className="song-meta" style={{ display: "flex", gap: 6, alignItems: "center" }}>
               {song.favorite && <span className="status favorite">Favorite</span>}
-              <span className="status section">{song.currentSection}</span>
+              <span className="status section">{(song.category ?? "song") === "song" ? song.currentSection : song.category === "message" ? "message" : "announcement"}</span>
               <button type="button" className="button subtle" style={{ padding: "4px 10px", fontSize: 12 }}
                 onClick={() => { setEditingSong({ ...song, slides: song.slides.map((s) => ({ ...s })) }); setShowAddForm(false); }}>
                 Edit
@@ -312,7 +371,9 @@ export function SongManagementPanel({ songs, onImportSong, onAddSong, onUpdateSo
         ))}
         {filteredSongs.length === 0 && (
           <p style={{ textAlign: "center", color: "var(--muted)", padding: 24 }}>
-            {songs.length === 0 ? "No songs yet. Add a song or import a file." : "No songs match your search."}
+            {songs.filter(s => (s.category ?? "song") === activeTab).length === 0 
+              ? `No ${activeTab === "message" ? "messages" : activeTab === "announcement" ? "announcements" : "songs"} yet.`
+              : `No ${activeTab === "message" ? "messages" : activeTab === "announcement" ? "announcements" : "songs"} match your search.`}
           </p>
         )}
       </div>
