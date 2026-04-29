@@ -11,7 +11,7 @@ import type { Song } from "@/src/types/production";
 const socket = createSocketClient();
 
 export default function SongsPage() {
-  const [songs, setSongs] = useState<Song[]>(songStore.getSongs);
+  const [songs, setSongs] = useState<Song[]>(() => songStore.getSongs());
   const [importStatus, setImportStatus] = useState("");
 
   useEffect(() => {

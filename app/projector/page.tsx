@@ -12,7 +12,7 @@ import { DEFAULT_SCENE_CONFIGS } from "@/src/types/scene";
 const socket = createSocketClient();
 
 export default function ProjectorPage() {
-  const [songs, setSongs] = useState<Song[]>(songStore.getSongs);
+  const [songs, setSongs] = useState<Song[]>(() => songStore.getSongs());
   const [currentSongId, setCurrentSongId] = useState(() => songStore.getSongs()[0]?.id ?? "");
   const [slideIndex, setSlideIndex] = useState(0);
   const [overlayEnabled, setOverlayEnabled] = useState(true);

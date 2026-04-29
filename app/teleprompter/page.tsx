@@ -9,7 +9,7 @@ import type { Song } from "@/src/types/production";
 const socket = createSocketClient();
 
 export default function TeleprompterPage() {
-  const [songs, setSongs] = useState<Song[]>(songStore.getSongs);
+  const [songs, setSongs] = useState<Song[]>(() => songStore.getSongs());
   const [currentSongId, setCurrentSongId] = useState(() => songStore.getSongs()[0]?.id ?? "");
   const [slideIndex, setSlideIndex] = useState(0);
   const [fontSize, setFontSize] = useState(42);

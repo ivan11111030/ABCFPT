@@ -44,7 +44,7 @@ type SignalingPayload = {
 };
 
 export default function ControlPage() {
-  const [songs, setSongs] = useState<Song[]>(songStore.getSongs);
+  const [songs, setSongs] = useState<Song[]>(() => songStore.getSongs());
   const [activeSongId, setActiveSongId] = useState(() => songStore.getSongs()[0]?.id ?? "");
   const [activeScene, setActiveScene] = useState<SceneMode>("worship");
   const [activeSceneType, setActiveSceneType] = useState<SceneType>("worship");
