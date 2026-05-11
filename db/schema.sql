@@ -1,6 +1,38 @@
 -- ABCF Production Team database schema for worship production
 
--- Songs table holds master song metadata.
+-- Content items can be songs, messages, or announcements
+CREATE TYPE item_category AS ENUM ('song', 'message', 'announcement');
+
+-- Items table holds all content metadata (songs, messages, announcements)
+CREATE TABLE items (
+  id TEXT PRIMARY KEY,
+  category item_category NOT NULL,
+  title TEXT NOT NULL,
+  artist TEXT,
+  "key" TEXT,
+  tempo INTEGER,
+  favorite BOOLEAN DEFAULT FALSE,
+  template_metadata JSONB,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Slides are ordered content within items
+CREATE TABLE slides (
+  id TEXT PRIMARY KEY,
+  item_id TEXT REFERENCES items(id) ON DELETE CASCADE,
+  section TEXT NOT NULL,
+  position INTEGER NOT NULL,
+  text TEXT NOT NULL,
+  background_url TEXT,
+  text_style JSONB,
+  rendered_image TEXT,
+  raw_xml TEXT,
+  transition JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Legacy songs table maintained for backwards compatibility
 CREATE TABLE songs (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
@@ -11,7 +43,7 @@ CREATE TABLE songs (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
--- Song sections and lyrics are stored as ordered slides.
+-- Legacy song sections and lyrics for backwards compatibility
 CREATE TABLE song_slides (
   id TEXT PRIMARY KEY,
   song_id TEXT REFERENCES songs(id) ON DELETE CASCADE,
@@ -22,7 +54,7 @@ CREATE TABLE song_slides (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
--- Setlists define order of songs for a service.
+-- Setlists define order of content for a service
 CREATE TABLE setlists (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
@@ -30,6 +62,18 @@ CREATE TABLE setlists (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
+-- Setlist memberships track which items are explicitly added to a setlist
+CREATE TABLE setlist_memberships (
+  id TEXT PRIMARY KEY,
+  setlist_id TEXT NOT NULL REFERENCES setlists(id) ON DELETE CASCADE,
+  item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  item_category item_category NOT NULL,
+  position INTEGER NOT NULL,
+  added_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  UNIQUE(setlist_id, item_id, item_category)
+);
+
+-- Legacy setlist_items table maintained for backwards compatibility
 CREATE TABLE setlist_items (
   id TEXT PRIMARY KEY,
   setlist_id TEXT REFERENCES setlists(id) ON DELETE CASCADE,

@@ -90,6 +90,58 @@ export type Camera = {
 
 export type SyncStatus = "connected" | "disconnected" | "pending";
 
+/** Item categories determine where content is displayed */
+export type ItemCategory = "song" | "message" | "announcement";
+
+/** Content item that can be added to a setlist */
+export type ContentItem = {
+  id: string;
+  category: ItemCategory;
+  title: string;
+  artist?: string;
+  key?: string;
+  tempo?: number;
+  favorite: boolean;
+  slides: Slide[];
+  /** Template metadata for preserving formatting from imported files */
+  templateMetadata?: {
+    originalFormat: string; // "pptx" | "txt" | "lrc"
+    backgroundColor?: string;
+    textColor?: string;
+    fontFamily?: string;
+  };
+  updatedAt?: number;
+};
+
+/** Represents an item's membership in a setlist */
+export type SetlistMembership = {
+  id: string;
+  setlistId: string;
+  itemId: string;
+  itemCategory: ItemCategory;
+  position: number;
+  addedAt: number;
+};
+
+/** Legacy Song type maintained for backwards compatibility */
+export type Song = {
+  id: string;
+  title: string;
+  artist: string;
+  key: string;
+  tempo: number;
+  currentSection: string;
+  slides: Slide[];
+  favorite: boolean;
+  templateMetadata?: {
+    originalFormat: string; // "pptx" | "txt" | "lrc"
+    backgroundColor?: string;
+    embeddedFonts?: string[];
+    importedAt?: number;
+  };
+  updatedAt?: number;
+};
+
 export type SetlistItem = {
   id: string;
   songId: string;

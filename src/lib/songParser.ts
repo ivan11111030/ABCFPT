@@ -67,6 +67,10 @@ export function parseTxtFile(content: string, fileName: string): Song {
     currentSection: slides[0]?.section || "Verse 1",
     slides,
     favorite: false,
+    templateMetadata: {
+      originalFormat: "txt",
+      importedAt: Date.now(),
+    },
   };
 }
 
@@ -103,6 +107,10 @@ export function parseLrcFile(content: string, fileName: string): Song {
     currentSection: slides[0]?.section || "Line 1",
     slides,
     favorite: false,
+    templateMetadata: {
+      originalFormat: "lrc",
+      importedAt: Date.now(),
+    },
   };
 }
 
@@ -252,6 +260,15 @@ export async function parsePptxFile(file: File): Promise<Song> {
     });
   }
 
+  // Extract dominant background color from slides
+  let dominantBgColor: string | undefined;
+  for (const slide of slides) {
+    if (slide.background) {
+      dominantBgColor = slide.background;
+      break;
+    }
+  }
+
   return {
     id: `song-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     title,
@@ -261,6 +278,12 @@ export async function parsePptxFile(file: File): Promise<Song> {
     currentSection: slides[0]?.section || "Slide 1",
     slides,
     favorite: false,
+    templateMetadata: {
+      originalFormat: "pptx",
+      backgroundColor: dominantBgColor,
+      embeddedFonts: embeddedFonts.length > 0 ? embeddedFonts : undefined,
+      importedAt: Date.now(),
+    },
   };
 }
 
