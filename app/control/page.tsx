@@ -33,9 +33,6 @@ import type { Camera, CameraTransition, SceneMode, Song, BackgroundConfig } from
 import type { SceneType, SceneConfig, SceneTemplate } from "@/src/types/scene";
 import { DEFAULT_SCENE_CONFIGS } from "@/src/types/scene";
 
-const socket = createSocketClient();
-const iceServers = getIceServers();
-
 type SignalingPayload = {
   cameraId?: string;
   cameraName?: string;
@@ -44,6 +41,10 @@ type SignalingPayload = {
 };
 
 export default function ControlPage() {
+  const socketRef = useRef(createSocketClient());
+  const iceServersRef = useRef(getIceServers());
+  const socket = socketRef.current;
+  const iceServers = iceServersRef.current;
   const [songs, setSongs] = useState<Song[]>(() => songStore.getSongs());
   const [activeSongId, setActiveSongId] = useState(() => songStore.getSongs()[0]?.id ?? "");
   const [activeScene, setActiveScene] = useState<SceneMode>("worship");
@@ -58,7 +59,7 @@ export default function ControlPage() {
   const [cameras, setCameras] = useState<Camera[]>(sampleCameras);
   const [connected, setConnected] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [rtmpUrl, setRtmpUrl] = useState("rtmp://live-api.facebook.com:80/rtmp/");
+  const [rtmpUrl, setRtmpUrl] = useState("rtmps://live-api-s.facebook.com:443/rtmp/");
   const [streamKey, setStreamKey] = useState("");
   const [isLive, setIsLive] = useState(false);
   const [standby, setStandby] = useState(false);

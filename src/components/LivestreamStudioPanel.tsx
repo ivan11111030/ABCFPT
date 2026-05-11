@@ -26,7 +26,7 @@ export function LivestreamStudioPanel({
   onChangeRtmpUrl,
   onChangeStreamKey,
 }: LivestreamStudioPanelProps) {
-  const [rtmpUrl, setRtmpUrl] = useState("rtmp://live-api.facebook.com:80/rtmp/");
+  const [rtmpUrl, setRtmpUrl] = useState("rtmps://live-api-s.facebook.com:443/rtmp/");
   const [streamKey, setStreamKey] = useState("");
 
   return (
@@ -55,7 +55,7 @@ export function LivestreamStudioPanel({
           <input
             type="text"
             value={rtmpUrl}
-            placeholder="rtmp://live-api.facebook.com:80/rtmp/"
+            placeholder="rtmps://live-api-s.facebook.com:443/rtmp/"
             onChange={(event) => {
               setRtmpUrl(event.target.value);
               onChangeRtmpUrl(event.target.value);
