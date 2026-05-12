@@ -45,7 +45,7 @@ function writeToStorage(items: SetlistItem[]) {
 
 let setlist: SetlistItem[] = readFromStorage() ?? 
   sampleSongs
-    .filter(s => (s.category ?? "song") === "song")
+    .filter(s => (s.templateMetadata?.originalFormat ?? "song") === "song")
     .map((s, idx) => ({ 
       id: `setlist-${s.id}`, 
       songId: s.id, 

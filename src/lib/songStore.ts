@@ -87,7 +87,7 @@ export function getSongs(): Song[] {
 
 /** Get songs filtered by category */
 export function getSongsByCategory(category: "song" | "message" | "announcement"): Song[] {
-  return songs.filter(s => (s.category ?? "song") === category);
+  return songs.filter(s => (s.templateMetadata?.originalFormat ?? "song") === category);
 }
 
 export function setSongs(next: Song[]) {
@@ -99,7 +99,7 @@ export function setSongs(next: Song[]) {
 export function addSong(song: Song) {
   if (songs.some((s) => s.id === song.id)) return;
   // Ensure category is set (default to "song")
-  const songWithCategory = { ...song, category: song.category ?? "song" as const };
+  const songWithCategory = { ...song, templateMetadata: { ...song.templateMetadata, originalFormat: song.templateMetadata?.originalFormat ?? "song" } };
   songs = [...songs, stamp(songWithCategory)];
   writeToStorage(songs);
   notify();

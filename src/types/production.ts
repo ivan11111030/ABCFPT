@@ -57,8 +57,13 @@ export type Song = {
   currentSection: string;
   slides: Slide[];
   favorite: boolean;
+  templateMetadata?: {
+    originalFormat?: string; // "song" | "message" | "announcement" | "pptx" | "txt" | "lrc"
+    backgroundColor?: string;
+    embeddedFonts?: string[];
+    importedAt?: number;
+  };
   updatedAt?: number;
-  category?: "song" | "message" | "announcement"; // Default: "song"
 };
 
 export type AudioState = {
@@ -121,25 +126,6 @@ export type SetlistMembership = {
   itemCategory: ItemCategory;
   position: number;
   addedAt: number;
-};
-
-/** Legacy Song type maintained for backwards compatibility */
-export type Song = {
-  id: string;
-  title: string;
-  artist: string;
-  key: string;
-  tempo: number;
-  currentSection: string;
-  slides: Slide[];
-  favorite: boolean;
-  templateMetadata?: {
-    originalFormat: string; // "pptx" | "txt" | "lrc"
-    backgroundColor?: string;
-    embeddedFonts?: string[];
-    importedAt?: number;
-  };
-  updatedAt?: number;
 };
 
 export type SetlistItem = {
