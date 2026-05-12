@@ -6,6 +6,7 @@ import {
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
   GoogleAuthProvider,
@@ -22,7 +23,7 @@ export default function AuthPage() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const user = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
   const isSubmitDisabled = loading || !email.trim() || !password.trim();
@@ -34,22 +35,31 @@ export default function AuthPage() {
         const result = await getRedirectResult(auth);
         if (result?.user) {
           // User successfully authenticated and returned from Firebase redirect
-          // Router will automatically redirect to /control via useAuth hook
-          router.replace("/control");
+          // The useAuth hook will detect the user change and redirect
+          console.log("Redirect auth successful:", result.user.email);
+          setMessage("");
         }
-      } catch (error) {
-        console.error("Redirect result error:", error);
+      } catch (error: unknown) {
+        const firebaseError = error as { code?: string; message?: string };
+        console.error("Redirect result error:", firebaseError);
+        if (firebaseError.code !== "auth/no-redirect-client-id") {
+          setMessage(firebaseError.message || "Google sign-in redirect failed.");
+        }
       }
+      setLoading(false);
     };
     
     void handleRedirectResult();
-  }, [router]);
+  }, []);
 
   useEffect(() => {
+    if (authLoading) return; // Wait for auth to load
+    
     if (user) {
+      // User is authenticated, redirect to control page
       router.replace("/control");
     }
-  }, [user, router]);
+  }, [user, authLoading, router]);
 
   const handleAuth = async () => {
     setLoading(true);
@@ -73,12 +83,32 @@ export default function AuthPage() {
     setMessage("");
 
     try {
-      // Use redirect flow to avoid COOP policy issues with popups
-      // This is more reliable and avoids cross-origin opener policy conflicts
+      // Try popup first (faster, no page reload)
       const provider = new GoogleAuthProvider();
-      await signInWithRedirect(auth, provider);
+      await signInWithPopup(auth, provider);
     } catch (error: unknown) {
       const firebaseError = error as { code?: string; message?: string };
+      
+      // If popup blocked or COOP issue, fallback to redirect
+      if (
+        firebaseError.code === "auth/popup-blocked"
+        || firebaseError.code === "auth/popup-closed-by-user"
+        || firebaseError.message?.includes("closed")
+      ) {
+        try {
+          const provider = new GoogleAuthProvider();
+          await signInWithRedirect(auth, provider);
+          // Page will redirect, no need to continue
+          return;
+        } catch (redirectError: unknown) {
+          const redirectErr = redirectError as { message?: string };
+          setMessage(redirectErr.message || "Google sign-in failed. Please try again.");
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // Show other errors
       setMessage(firebaseError.message || "Google sign-in failed. Please try again.");
       setLoading(false);
     }
