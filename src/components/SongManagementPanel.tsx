@@ -287,6 +287,9 @@ export function SongManagementPanel({ songs, onImportSong, onAddSong, onUpdateSo
           <button type="button" className="button primary" onClick={() => { setActiveTab("songs"); setItemCategory("song"); setShowAddForm(true); setNewSong(emptySong("song")); }}>
             + Add
           </button>
+          <button type="button" className="button outline" onClick={handleImportClick}>
+            Import File
+          </button>
         </div>
       </div>
 
