@@ -85,6 +85,11 @@ export function getSongs(): Song[] {
   return songs;
 }
 
+/** Get songs filtered by category */
+export function getSongsByCategory(category: "song" | "message" | "announcement"): Song[] {
+  return songs.filter(s => (s.category ?? "song") === category);
+}
+
 export function setSongs(next: Song[]) {
   songs = next;
   writeToStorage(songs);
@@ -93,7 +98,9 @@ export function setSongs(next: Song[]) {
 
 export function addSong(song: Song) {
   if (songs.some((s) => s.id === song.id)) return;
-  songs = [...songs, stamp(song)];
+  // Ensure category is set (default to "song")
+  const songWithCategory = { ...song, category: song.category ?? "song" as const };
+  songs = [...songs, stamp(songWithCategory)];
   writeToStorage(songs);
   notify();
 }

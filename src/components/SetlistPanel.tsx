@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState, type DragEvent } from "react";
-import type { Song } from "@/src/types/production";
+import { useMemo, useState, type DragEvent, useEffect } from "react";
+import type { Song, SetlistItem } from "@/src/types/production";
 import * as songStore from "@/src/lib/songStore";
+import * as setlistStore from "@/src/lib/setlistStore";
 
 type SetlistPanelProps = {
   songs: Song[];
@@ -16,9 +17,27 @@ export function SetlistPanel({ songs, activeSongId, onSelectSong, onReorder }: S
   const [search, setSearch] = useState("");
   const [cloudBusy, setCloudBusy] = useState(false);
   const [cloudMsg, setCloudMsg] = useState("");
+  const [setlistItems, setSetlistItems] = useState<SetlistItem[]>(() => setlistStore.getSetlist());
 
-  // Filter to only show songs (not messages/announcements) for the setlist
-  const setlistSongs = useMemo(() => songs.filter(s => s.category !== "message" && s.category !== "announcement"), [songs]);
+  // Subscribe to setlist store changes
+  useEffect(() => {
+    const unsubscribe = setlistStore.subscribe(() => {
+      setSetlistItems(setlistStore.getSetlist());
+    });
+    return unsubscribe;
+  }, []);
+
+  // Get the actual songs for items in setlist
+  const setlistSongs = useMemo(() => {
+    return setlistItems
+      .map(item => songs.find(s => s.id === item.songId))
+      .filter((s): s is Song => s !== undefined)
+      .sort((a, b) => {
+        const aPos = setlistItems.find(item => item.songId === a.id)?.position ?? 0;
+        const bPos = setlistItems.find(item => item.songId === b.id)?.position ?? 0;
+        return aPos - bPos;
+      });
+  }, [setlistItems, songs]);
 
   const filteredSongs = useMemo(() => {
     if (!search.trim()) return setlistSongs;
@@ -42,7 +61,13 @@ export function SetlistPanel({ songs, activeSongId, onSelectSong, onReorder }: S
     event.preventDefault();
     const sourceId = event.dataTransfer.getData("text/plain");
     if (sourceId && sourceId !== targetId) {
-      onReorder(sourceId, targetId);
+      const reordered = setlistSongs.map(s => s.id);
+      const sourceIdx = reordered.indexOf(sourceId);
+      const targetIdx = reordered.indexOf(targetId);
+      if (sourceIdx >= 0 && targetIdx >= 0) {
+        [reordered[sourceIdx], reordered[targetIdx]] = [reordered[targetIdx], reordered[sourceIdx]];
+        setlistStore.reorderSetlist(reordered);
+      }
     }
     setDraggedSongId(null);
   };
@@ -89,29 +114,38 @@ export function SetlistPanel({ songs, activeSongId, onSelectSong, onReorder }: S
       <input
         type="search"
         className="setlist-search"
-        placeholder="Search songs..."
+        placeholder="Search setlist..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
       <div className="setlist-items">
-        {filteredSongs.map((song, index) => (
-          <button
-            key={song.id}
-            type="button"
-            className={`setlist-item ${song.id === activeSongId ? "active" : ""} ${song.id === draggedSongId ? "dragging" : ""}`}
-            draggable
-            onClick={() => onSelectSong(song.id)}
-            onDragStart={(event) => handleDragStart(event, song.id)}
-            onDragOver={handleDragOver}
-            onDrop={(event) => handleDrop(event, song.id)}
-          >
-            <span className="setlist-number">{index + 1}</span>
-            <div className="setlist-item-info">
-              <span>{song.title}</span>
-              <small>{song.artist}</small>
-            </div>
-          </button>
-        ))}
+        {filteredSongs.length === 0 ? (
+          <div style={{ padding: "16px 8px", textAlign: "center", fontSize: 12, color: "var(--muted)" }}>
+            {setlistItems.length === 0 
+              ? "No songs in setlist. Add songs from Song Management."
+              : "No matching songs in setlist."
+            }
+          </div>
+        ) : (
+          filteredSongs.map((song, index) => (
+            <button
+              key={song.id}
+              type="button"
+              className={`setlist-item ${song.id === activeSongId ? "active" : ""} ${song.id === draggedSongId ? "dragging" : ""}`}
+              draggable
+              onClick={() => onSelectSong(song.id)}
+              onDragStart={(event) => handleDragStart(event, song.id)}
+              onDragOver={handleDragOver}
+              onDrop={(event) => handleDrop(event, song.id)}
+            >
+              <span className="setlist-number">{index + 1}</span>
+              <div className="setlist-item-info">
+                <span>{song.title}</span>
+                <small>{song.artist}</small>
+              </div>
+            </button>
+          ))
+        )}
       </div>
     </div>
   );
