@@ -70,6 +70,22 @@ function setLastSyncTs(ts: number) {
   } catch { /* skip */ }
 }
 
+const CLOUD_SYNC_DEBOUNCE_MS = 2500;
+let cloudSyncTimeoutId: number | null = null;
+
+function scheduleCloudSync() {
+  if (typeof window === "undefined") return;
+  if (cloudSyncTimeoutId !== null) {
+    window.clearTimeout(cloudSyncTimeoutId);
+  }
+  cloudSyncTimeoutId = window.setTimeout(() => {
+    uploadToCloud().catch(() => {
+      /* Cloud sync failed silently; local data remains */
+    });
+    cloudSyncTimeoutId = null;
+  }, CLOUD_SYNC_DEBOUNCE_MS);
+}
+
 // ── state ──────────────────────────────────────────────────────────────
 
 let songs: Song[] = readFromStorage() ?? [...sampleSongs];
@@ -103,6 +119,7 @@ export function addSong(song: Song) {
   songs = [...songs, stamp(songWithCategory)];
   writeToStorage(songs);
   notify();
+  scheduleCloudSync();
 }
 
 export function updateSong(song: Song) {
@@ -111,12 +128,14 @@ export function updateSong(song: Song) {
   songs = songs.map((s) => (s.id === song.id ? stamp(song) : s));
   writeToStorage(songs);
   notify();
+  scheduleCloudSync();
 }
 
 export function deleteSong(songId: string) {
   songs = songs.filter((s) => s.id !== songId);
   writeToStorage(songs);
   notify();
+  scheduleCloudSync();
 }
 
 export function reorderSongs(songIds: string[]) {
@@ -131,6 +150,7 @@ export function reorderSongs(songIds: string[]) {
   songs = ordered;
   writeToStorage(songs);
   notify();
+  scheduleCloudSync();
 }
 
 /**

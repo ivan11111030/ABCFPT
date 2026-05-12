@@ -24,6 +24,10 @@ export default function SongsPage() {
       setSongs(songStore.getSongs());
     });
 
+    songStore.downloadFromCloud(true).catch(() => {
+      // If cloud sync fails, continue using local storage and real-time socket sync.
+    });
+
     return () => {
       socket.off("state:sync");
       socket.off("song:list");
