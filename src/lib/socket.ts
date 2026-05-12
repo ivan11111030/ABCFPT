@@ -20,7 +20,10 @@ export const createSocketClient = (): Socket => {
     } as unknown as Socket;
   }
 
-  socket = io(getSocketServerUrl(), {
+  const serverUrl = getSocketServerUrl();
+  console.log("[Socket] Connecting to:", serverUrl);
+
+  socket = io(serverUrl, {
     // Try WebSocket first, then fall back to polling if WebSocket fails
     transports: ["websocket", "polling"],
     autoConnect: true,
@@ -30,6 +33,23 @@ export const createSocketClient = (): Socket => {
     reconnectionDelayMax: 5000,
     upgrade: true, // Allow upgrade from polling to websocket
     rememberUpgrade: true, // Remember the upgrade for next connection
+  });
+
+  // Add connection logging
+  socket.on("connect", () => {
+    console.log("[Socket] Connected successfully, ID:", socket.id);
+  });
+
+  socket.on("connect_error", (error: Error) => {
+    console.error("[Socket] Connection error:", error.message);
+  });
+
+  socket.on("disconnect", (reason: string) => {
+    console.log("[Socket] Disconnected:", reason);
+  });
+
+  socket.on("error", (error: unknown) => {
+    console.error("[Socket] Error:", error);
   });
 
   return socket;

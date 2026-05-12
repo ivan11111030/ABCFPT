@@ -479,6 +479,22 @@ export default function ControlPage() {
       setStreamStatus("Error: Stream Key is required");
       return;
     }
+
+    // Check socket connection
+    if (!socket.connected) {
+      setStreamStatus("Error: Socket not connected to server. Reconnecting...");
+      socket.connect();
+      window.setTimeout(() => {
+        if (socket.connected) {
+          setStreamStatus("Connecting...");
+          socket.emit("stream:start", { rtmpUrl, streamKey, scene: activeScene, cameraId: activeCameraId });
+        } else {
+          setStreamStatus("Error: Cannot connect to server. Check your connection.");
+        }
+      }, 1500);
+      return;
+    }
+
     setStreamStatus("Connecting...");
 
     // Tell server to start ffmpeg process first
