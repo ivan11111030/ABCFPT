@@ -483,15 +483,14 @@ export default function ControlPage() {
     // Check socket connection
     if (!socket.connected) {
       setStreamStatus("Error: Socket not connected to server. Reconnecting...");
+      socket.once("connect", () => {
+        setStreamStatus("Connected. Starting stream...");
+        socket.emit("stream:start", { rtmpUrl, streamKey, scene: activeScene, cameraId: activeCameraId });
+      });
+      socket.once("connect_error", () => {
+        setStreamStatus("Error: Cannot connect to server. Check your connection.");
+      });
       socket.connect();
-      window.setTimeout(() => {
-        if (socket.connected) {
-          setStreamStatus("Connecting...");
-          socket.emit("stream:start", { rtmpUrl, streamKey, scene: activeScene, cameraId: activeCameraId });
-        } else {
-          setStreamStatus("Error: Cannot connect to server. Check your connection.");
-        }
-      }, 1500);
       return;
     }
 

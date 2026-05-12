@@ -24,20 +24,24 @@ export const createSocketClient = (): Socket => {
   console.log("[Socket] Connecting to:", serverUrl);
 
   socket = io(serverUrl, {
-    // Try WebSocket first, then fall back to polling if WebSocket fails
-    transports: ["websocket", "polling"],
+    // Start with polling and then upgrade to WebSocket where possible.
+    transports: ["polling", "websocket"],
     autoConnect: true,
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
-    upgrade: true, // Allow upgrade from polling to websocket
+    timeout: 20000,
+    withCredentials: false,
+    upgrade: true, // Allow transport upgrade from polling to websocket
     rememberUpgrade: true, // Remember the upgrade for next connection
   });
 
+  const client = socket;
+
   // Add connection logging
-  socket.on("connect", () => {
-    console.log("[Socket] Connected successfully, ID:", socket.id);
+  client.on("connect", () => {
+    console.log("[Socket] Connected successfully, ID:", client.id);
   });
 
   socket.on("connect_error", (error: Error) => {

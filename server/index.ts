@@ -201,7 +201,7 @@ const io = new Server(server, {
   cors: {
     origin: corsOrigins.length === 1 && corsOrigins[0] === "*" ? "*" : corsOrigins,
     methods: ["GET", "POST"],
-    credentials: true,
+    credentials: corsOrigins.length === 1 && corsOrigins[0] === "*" ? false : true,
   },
   pingInterval: 25000,
   pingTimeout: 60000,
