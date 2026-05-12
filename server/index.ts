@@ -224,11 +224,6 @@ app.use((req: Request, res: Response, next) => {
 
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  
-  // Allow popups (for Firebase auth, Facebook Live, etc) to close themselves
-  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
-  // Relaxed embedder policy to allow iframe/popup communication
-  res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
 
   if (req.method === "OPTIONS") {
     res.status(204).end();

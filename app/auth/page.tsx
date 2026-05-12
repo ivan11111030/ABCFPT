@@ -6,7 +6,6 @@ import {
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
-  signInWithPopup,
   signInWithRedirect,
   GoogleAuthProvider,
   signOut,
@@ -55,28 +54,13 @@ export default function AuthPage() {
     setMessage("");
 
     try {
+      // Use redirect flow to avoid COOP policy issues with popups
+      // This is more reliable and avoids cross-origin opener policy conflicts
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      await signInWithRedirect(auth, provider);
     } catch (error: unknown) {
       const firebaseError = error as { code?: string; message?: string };
-      // Fallback to redirect flow for popup-blocked, COOP issues, or user closure
-      if (
-        firebaseError.code === "auth/popup-blocked"
-        || firebaseError.code === "auth/popup-closed-by-user"
-        || (firebaseError.message && firebaseError.message.includes("COOP"))
-      ) {
-        try {
-          const provider = new GoogleAuthProvider();
-          await signInWithRedirect(auth, provider);
-          return;
-        } catch (redirectError: unknown) {
-          setMessage((redirectError as Error).message || "Google sign-in failed. Please try again.");
-          setLoading(false);
-          return;
-        }
-      }
-
-      setMessage(firebaseError.message || "Google sign-in failed.");
+      setMessage(firebaseError.message || "Google sign-in failed. Please try again.");
       setLoading(false);
     }
 
