@@ -31,7 +31,7 @@ export default function SongsPage() {
     };
   }, []);
 
-  const handleImport = async (files?: FileList | File[]) => {
+  const handleImport = async (files?: FileList | File[], category: "song" | "message" | "announcement" = "song") => {
     if (!files || files.length === 0) return;
 
     const imported: Song[] = [];
@@ -41,7 +41,14 @@ export default function SongsPage() {
       try {
         const song = await parseFile(file);
         if (song) {
-          imported.push(song);
+          // Tag with the appropriate category
+          imported.push({
+            ...song,
+            templateMetadata: {
+              ...song.templateMetadata,
+              originalFormat: category,
+            },
+          });
         } else {
           errors.push(`${file.name}: Unsupported file format. Use .txt, .lrc, or .pptx.`);
         }
@@ -55,7 +62,8 @@ export default function SongsPage() {
         songStore.addSong(song);
       }
       socket.emit("song:import", imported);
-      setImportStatus(`✓ Imported ${imported.length} song(s) successfully.`);
+      const categoryLabel = category === "song" ? "Songs" : category === "message" ? "Messages" : "Announcements";
+      setImportStatus(`✓ Imported ${imported.length} ${categoryLabel.toLowerCase()} successfully.`);
     }
     if (errors.length > 0) {
       setImportStatus((prev) => (prev ? prev + " " : "") + errors.join(" "));

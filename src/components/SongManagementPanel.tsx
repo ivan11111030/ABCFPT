@@ -40,7 +40,7 @@ function TextStyleControls({ style = {}, onChange }: { style?: TextStyle; onChan
 
 type SongManagementPanelProps = {
   songs: Song[];
-  onImportSong?: (files: FileList | File[]) => void;
+  onImportSong?: (files: FileList | File[], category: "song" | "message" | "announcement") => void;
   onAddSong?: (song: Song) => void;
   onUpdateSong?: (song: Song) => void;
   onDeleteSong?: (songId: string) => void;
@@ -139,7 +139,7 @@ export function SongManagementPanel({ songs, onImportSong, onAddSong, onUpdateSo
     if (!files) return;
     const fileArray = Array.from(files);
     setDroppedFiles(fileArray);
-    onImportSong?.(files);
+    onImportSong?.(files, itemCategory);
   };
 
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
