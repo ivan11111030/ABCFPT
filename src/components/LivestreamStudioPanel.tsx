@@ -50,9 +50,11 @@ export function LivestreamStudioPanel({
         <strong>{transition}</strong>
       </div>
       <div className="studio-input-group">
-        <label>
+        <label htmlFor="rtmp-url">
           Facebook RTMP URL
           <input
+            id="rtmp-url"
+            name="rtmp-url"
             type="text"
             value={rtmpUrl}
             placeholder="rtmps://live-api-s.facebook.com:443/rtmp/"
@@ -62,9 +64,11 @@ export function LivestreamStudioPanel({
             }}
           />
         </label>
-        <label>
+        <label htmlFor="stream-key">
           Stream Key
           <input
+            id="stream-key"
+            name="stream-key"
             type="password"
             value={streamKey}
             placeholder="Enter your Facebook stream key"

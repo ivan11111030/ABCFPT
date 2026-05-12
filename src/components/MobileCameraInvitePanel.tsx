@@ -58,9 +58,11 @@ export function MobileCameraInvitePanel() {
             </p>
           </div>
 
-          <label className="camera-name-input">
+          <label className="camera-name-input" htmlFor="mobile-camera-name">
             Camera Name
             <input
+              id="mobile-camera-name"
+              name="mobile-camera-name"
               type="text"
               value={cameraName}
               onChange={(event) => setCameraName(event.target.value)}
@@ -68,9 +70,9 @@ export function MobileCameraInvitePanel() {
             />
           </label>
 
-          <label className="camera-name-input">
+          <label className="camera-name-input" htmlFor="mobile-resolution">
             Preferred Resolution
-            <select value={resolution} onChange={(event) => setResolution(event.target.value)}>
+            <select id="mobile-resolution" name="mobile-resolution" value={resolution} onChange={(event) => setResolution(event.target.value)}>
               <option value="720p">720p</option>
               <option value="1080p">1080p</option>
             </select>

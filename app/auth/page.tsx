@@ -7,6 +7,7 @@ import {
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   signOut,
 } from "firebase/auth";
@@ -25,6 +26,24 @@ export default function AuthPage() {
   const router = useRouter();
 
   const isSubmitDisabled = loading || !email.trim() || !password.trim();
+
+  useEffect(() => {
+    // Handle redirect result from Firebase auth (e.g., after returning from Google sign-in)
+    const handleRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          // User successfully authenticated and returned from Firebase redirect
+          // Router will automatically redirect to /control via useAuth hook
+          router.replace("/control");
+        }
+      } catch (error) {
+        console.error("Redirect result error:", error);
+      }
+    };
+    
+    void handleRedirectResult();
+  }, [router]);
 
   useEffect(() => {
     if (user) {
@@ -122,9 +141,11 @@ export default function AuthPage() {
           event.preventDefault();
           void handleAuth();
         }}>
-          <label>
+          <label htmlFor="email">
             Email
             <input
+              id="email"
+              name="email"
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
@@ -133,9 +154,11 @@ export default function AuthPage() {
               required
             />
           </label>
-          <label>
+          <label htmlFor="password">
             Password
             <input
+              id="password"
+              name="password"
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
