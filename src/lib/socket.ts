@@ -21,12 +21,15 @@ export const createSocketClient = (): Socket => {
   }
 
   socket = io(getSocketServerUrl(), {
-    transports: ["websocket"],
+    // Try WebSocket first, then fall back to polling if WebSocket fails
+    transports: ["websocket", "polling"],
     autoConnect: true,
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
+    upgrade: true, // Allow upgrade from polling to websocket
+    rememberUpgrade: true, // Remember the upgrade for next connection
   });
 
   return socket;

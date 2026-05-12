@@ -12,4 +12,4 @@ services:
       - key: PUBLIC_HOST
         sync: false
       - key: CLIENT_ORIGIN
-        value: https://ivan11111030.github.io
+        value: https://ivan11111030.github.io,https://ivan11111030.github.io/ABCFPT
