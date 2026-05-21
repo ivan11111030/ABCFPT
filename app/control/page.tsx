@@ -44,8 +44,9 @@ export default function ControlPage() {
   const iceServersRef = useRef(getIceServers());
   const socket = socketRef.current;
   const iceServers = iceServersRef.current;
-  const [songs, setSongs] = useState<Song[]>(() => songStore.getSongs());
-  const [activeSongId, setActiveSongId] = useState(() => songStore.getSongs()[0]?.id ?? "");
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [songs, setSongs] = useState<Song[]>([]);
+  const [activeSongId, setActiveSongId] = useState("");
   const [activeScene, setActiveScene] = useState<SceneMode>("worship");
   const [activeSceneType, setActiveSceneType] = useState<SceneType>("worship");
   const [activeSceneConfig, setActiveSceneConfig] = useState<SceneConfig>(DEFAULT_SCENE_CONFIGS.worship);
@@ -71,9 +72,9 @@ export default function ControlPage() {
   const [leftWidth, setLeftWidth] = useState(280);
   const [rightWidth, setRightWidth] = useState(320);
   const [showRightPanel, setShowRightPanel] = useState(true);
-  const [localStreams, setLocalStreams] = useState<Record<string, MediaStream>>(camStore.getLocalStreams);
-  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>(camStore.getRemoteStreams);
-  const [snapshotFrames, setSnapshotFrames] = useState<Record<string, string>>(camStore.getSnapshotFrames);
+  const [localStreams, setLocalStreams] = useState<Record<string, MediaStream>>({});
+  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
+  const [snapshotFrames, setSnapshotFrames] = useState<Record<string, string>>({});
   const [overlayEnabled, setOverlayEnabled] = useState(true);
   const [overlayLayout, setOverlayLayout] = useState<OverlayLayout>("lower-third");
   const [overlayPos, setOverlayPos] = useState<OverlayPosition>(LAYOUT_PRESETS["lower-third"]);
@@ -95,6 +96,25 @@ export default function ControlPage() {
   const pendingStreamStartRef = useRef(false);
 
   const router = useRouter();
+
+  useEffect(() => {
+    setSongs(songStore.getSongs());
+    const initialSongId = songStore.getSongs()[0]?.id ?? "";
+    setActiveSongId((current) => current || initialSongId);
+    setLocalStreams(camStore.getLocalStreams());
+    setRemoteStreams(camStore.getRemoteStreams());
+    setSnapshotFrames(camStore.getSnapshotFrames());
+    setIsHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!activeCameraId && cameras.length > 0) {
+      setActiveCameraId(cameras[0].id);
+    }
+    if (!previewCameraId && cameras.length > 0) {
+      setPreviewCameraId((current) => current || cameras[0].id);
+    }
+  }, [cameras, activeCameraId, previewCameraId]);
 
   const reconnectDisplays = useCallback(() => {
     // Emit current state to all connected display clients (projector/teleprompter)

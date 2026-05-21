@@ -9,8 +9,8 @@ import type { Song } from "@/src/types/production";
 const socket = createSocketClient();
 
 export default function TeleprompterPage() {
-  const [songs, setSongs] = useState<Song[]>(() => songStore.getSongs());
-  const [currentSongId, setCurrentSongId] = useState(() => songStore.getSongs()[0]?.id ?? "");
+  const [songs, setSongs] = useState<Song[]>([]);
+  const [currentSongId, setCurrentSongId] = useState("");
   const [slideIndex, setSlideIndex] = useState(0);
   const [fontSize, setFontSize] = useState(42);
   const [darkMode, setDarkMode] = useState(true);
@@ -20,6 +20,10 @@ export default function TeleprompterPage() {
   const song = songs.find((s) => s.id === currentSongId) ?? songs[0];
 
   useEffect(() => {
+    const loadedSongs = songStore.getSongs();
+    setSongs(loadedSongs);
+    setCurrentSongId((current) => current || (loadedSongs[0]?.id ?? ""));
+
     socket.on("connect", () => setConnected(true));
     socket.on("disconnect", () => setConnected(false));
 

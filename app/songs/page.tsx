@@ -11,10 +11,11 @@ import type { Song } from "@/src/types/production";
 const socket = createSocketClient();
 
 export default function SongsPage() {
-  const [songs, setSongs] = useState<Song[]>(() => songStore.getSongs());
+  const [songs, setSongs] = useState<Song[]>([]);
   const [importStatus, setImportStatus] = useState("");
 
   useEffect(() => {
+    setSongs(songStore.getSongs());
     socket.on("state:sync", (serverState: any) => {
       if (serverState.songs?.length) songStore.mergeFromServer(serverState.songs);
     });

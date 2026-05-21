@@ -12,8 +12,8 @@ import { DEFAULT_SCENE_CONFIGS } from "@/src/types/scene";
 const socket = createSocketClient();
 
 export default function ProjectorPage() {
-  const [songs, setSongs] = useState<Song[]>(() => songStore.getSongs());
-  const [currentSongId, setCurrentSongId] = useState(() => songStore.getSongs()[0]?.id ?? "");
+  const [songs, setSongs] = useState<Song[]>([]);
+  const [currentSongId, setCurrentSongId] = useState("");
   const [slideIndex, setSlideIndex] = useState(0);
   const [overlayEnabled, setOverlayEnabled] = useState(true);
   const [overlayPos, setOverlayPos] = useState<OverlayPosition>(LAYOUT_PRESETS["lower-third"]);
@@ -32,6 +32,12 @@ export default function ProjectorPage() {
   const [prevSlideIndex, setPrevSlideIndex] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
+
+  useEffect(() => {
+    const loadedSongs = songStore.getSongs();
+    setSongs(loadedSongs);
+    setCurrentSongId((current) => current || (loadedSongs[0]?.id ?? ""));
+  }, []);
 
   const song = songs.find((s) => s.id === currentSongId) ?? songs[0];
 

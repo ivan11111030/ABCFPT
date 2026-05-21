@@ -35,6 +35,8 @@ type Camera = {
 /* ── Shared in-memory state ─────────────────────────── */
 
 /* ── Persistent song file on disk ───────────────────── */
+const __filename = new URL(import.meta.url).pathname;
+const __dirname = path.dirname(__filename);
 const CLOUD_SONGS_PATH = path.join(__dirname, "cloud_songs.json");
 
 type CloudData = {
