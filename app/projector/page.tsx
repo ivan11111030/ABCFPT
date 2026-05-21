@@ -19,6 +19,7 @@ export default function ProjectorPage() {
   const [overlayPos, setOverlayPos] = useState<OverlayPosition>(LAYOUT_PRESETS["lower-third"]);
   const [overlayOpacity, setOverlayOpacity] = useState(100);
   const [overlayHeight, setOverlayHeight] = useState(25);
+  const [projectorFontSize, setProjectorFontSize] = useState(42);
   const [hasVideoStream, setHasVideoStream] = useState(false);
   const [connected, setConnected] = useState(false);
   const [standby, setStandby] = useState(false);
@@ -49,6 +50,11 @@ export default function ProjectorPage() {
       if (serverState.standby !== undefined) setStandby(serverState.standby);
       if (serverState.background) setBackground(serverState.background);
       if (serverState.currentScene) setActiveScene(serverState.currentScene);
+      if (serverState.projectorFontSize !== undefined) setProjectorFontSize(serverState.projectorFontSize);
+    });
+
+    socket.on("display:projectorFontSize", (size: number) => {
+      setProjectorFontSize(size);
     });
 
     // Live updates
@@ -145,6 +151,7 @@ export default function ProjectorPage() {
       socket.off("stream:overlayOpacity");
       socket.off("stream:overlayHeight");
       socket.off("stream:canvaOverlay");
+      socket.off("display:projectorFontSize");
       socket.off("projector:offer");
       socket.off("projector:candidate");
       pcRef.current?.close();
@@ -227,7 +234,7 @@ export default function ProjectorPage() {
                 className="projector-line"
                 style={{
                   fontFamily: currentSlide.textStyle?.fontFamily,
-                  fontSize: currentSlide.textStyle?.fontSize ? `${currentSlide.textStyle.fontSize}px` : undefined,
+                  fontSize: currentSlide.textStyle?.fontSize ? `${currentSlide.textStyle.fontSize}px` : `${projectorFontSize}px`,
                   color: currentSlide.textStyle?.color ?? "#fff",
                   textAlign: currentSlide.textStyle?.align ?? "center",
                   fontWeight: currentSlide.textStyle?.bold ? 700 : undefined,

@@ -8,7 +8,6 @@
  */
 
 import type { SetlistItem } from "@/src/types/production";
-import { sampleSongs } from "@/src/lib/fakeData";
 
 const STORAGE_KEY = "abcfpt_setlist";
 
@@ -43,14 +42,7 @@ function writeToStorage(items: SetlistItem[]) {
 
 // ── state ──────────────────────────────────────────────────────────────
 
-let setlist: SetlistItem[] = readFromStorage() ?? 
-  sampleSongs
-    .filter(s => (s.templateMetadata?.originalFormat ?? "song") === "song")
-    .map((s, idx) => ({ 
-      id: `setlist-${s.id}`, 
-      songId: s.id, 
-      position: idx 
-    }));
+let setlist: SetlistItem[] = readFromStorage() ?? [];
 
 // ── public API ─────────────────────────────────────────────────────────
 

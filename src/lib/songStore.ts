@@ -9,7 +9,6 @@
  */
 
 import type { Song } from "@/src/types/production";
-import { sampleSongs } from "@/src/lib/fakeData";
 import { getSocketServerUrl } from "@/src/lib/realtimeConfig";
 
 const STORAGE_KEY = "abcfpt_songs";
@@ -71,6 +70,16 @@ function setLastSyncTs(ts: number) {
 }
 
 const CLOUD_SYNC_DEBOUNCE_MS = 2500;
+
+export async function initializeSongStore(): Promise<{ ok: boolean; message: string; count: number }> {
+  if (typeof window === "undefined") {
+    return { ok: true, message: "Server-side initialization skipped.", count: 0 };
+  }
+
+  const localSongs = readFromStorage();
+  const sinceLastSync = Boolean(localSongs && localSongs.length > 0);
+  return downloadFromCloud(sinceLastSync);
+}
 let cloudSyncTimeoutId: number | null = null;
 
 function scheduleCloudSync() {
@@ -88,7 +97,7 @@ function scheduleCloudSync() {
 
 // ── state ──────────────────────────────────────────────────────────────
 
-let songs: Song[] = readFromStorage() ?? [...sampleSongs];
+let songs: Song[] = readFromStorage() ?? [];
 
 // ── public API ─────────────────────────────────────────────────────────
 

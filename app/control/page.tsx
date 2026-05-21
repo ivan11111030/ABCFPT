@@ -27,7 +27,6 @@ import { createSocketClient } from "@/src/lib/socket";
 import * as camStore from "@/src/lib/cameraStreamStore";
 import * as songStore from "@/src/lib/songStore";
 import * as sceneStore from "@/src/lib/sceneStore";
-import { sampleCameras } from "@/src/lib/fakeData";
 import { parseFile } from "@/src/lib/songParser";
 import type { Camera, CameraTransition, SceneMode, Song, BackgroundConfig } from "@/src/types/production";
 import type { SceneType, SceneConfig, SceneTemplate } from "@/src/types/scene";
@@ -53,10 +52,10 @@ export default function ControlPage() {
   const [showSceneEditor, setShowSceneEditor] = useState(false);
   const [showSceneLibrary, setShowSceneLibrary] = useState(false);
   const [editingScene, setEditingScene] = useState<SceneTemplate | null>(null);
-  const [activeCameraId, setActiveCameraId] = useState<string>(sampleCameras[0].id);
-  const [previewCameraId, setPreviewCameraId] = useState<string>(sampleCameras[1]?.id ?? sampleCameras[0].id);
+  const [activeCameraId, setActiveCameraId] = useState<string>("");
+  const [previewCameraId, setPreviewCameraId] = useState<string>("");
   const [cameraTransition, setCameraTransition] = useState<CameraTransition>("cut");
-  const [cameras, setCameras] = useState<Camera[]>(sampleCameras);
+  const [cameras, setCameras] = useState<Camera[]>([]);
   const [connected, setConnected] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [rtmpUrl, setRtmpUrl] = useState("rtmps://live-api-s.facebook.com:443/rtmp/");
@@ -64,6 +63,8 @@ export default function ControlPage() {
   const [isLive, setIsLive] = useState(false);
   const [standby, setStandby] = useState(false);
   const [background, setBackground] = useState<BackgroundConfig>({ type: "color", value: "#000000", opacity: 100 });
+  const [teleprompterFontSize, setTeleprompterFontSize] = useState(42);
+  const [projectorFontSize, setProjectorFontSize] = useState(42);
   const [streamStatus, setStreamStatus] = useState("");
   const [programFlash, setProgramFlash] = useState(false);
   const [showSongManager, setShowSongManager] = useState(false);
@@ -109,8 +110,10 @@ export default function ControlPage() {
       background: background,
       sceneType: activeSceneType,
       sceneConfig: activeSceneConfig,
+      teleprompterFontSize: teleprompterFontSize,
+      projectorFontSize: projectorFontSize,
     });
-  }, [songs, activeSongId, currentSlide, activeScene, cameras, activeCameraId, cameraTransition, isLive, overlayEnabled, overlayPos, standby, background, activeSceneType, activeSceneConfig]);
+  }, [songs, activeSongId, currentSlide, activeScene, cameras, activeCameraId, cameraTransition, isLive, overlayEnabled, overlayPos, standby, background, activeSceneType, activeSceneConfig, teleprompterFontSize, projectorFontSize]);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -137,16 +140,13 @@ export default function ControlPage() {
       if (serverState.overlayPosition) setOverlayPos(serverState.overlayPosition);
       if (serverState.standby !== undefined) setStandby(serverState.standby);
       if (serverState.background) setBackground(serverState.background);
+      if (serverState.teleprompterFontSize !== undefined) setTeleprompterFontSize(serverState.teleprompterFontSize);
+      if (serverState.projectorFontSize !== undefined) setProjectorFontSize(serverState.projectorFontSize);
     });
 
-    // Live updates
-    socket.on("control:slide", (nextSlide: number) => setCurrentSlide(nextSlide));
-    socket.on("control:song", (songId: string) => { setActiveSongId(songId); setCurrentSlide(0); });
-    socket.on("control:camera", (cameraId: string) => setActiveCameraId(cameraId));
-    socket.on("control:scene", (payload: any) => { const scene = typeof payload === "string" ? payload : payload.scene; if (scene) setActiveScene(scene); if (payload?.sceneType) setActiveSceneType(payload.sceneType); if (payload?.sceneConfig) setActiveSceneConfig(payload.sceneConfig); });
-    socket.on("camera:list", (cameraList: Camera[]) => setCameras(cameraList));
-    socket.on("song:list", (songList: Song[]) => songStore.setSongs(songList));
-    socket.on("stream:started", () => { setIsLive(true); setStreamStatus("Live"); });
+    socket.on("display:teleprompterFontSize", (size: number) => setTeleprompterFontSize(size));
+    socket.on("display:projectorFontSize", (size: number) => setProjectorFontSize(size));
+
     socket.on("stream:stopped", () => {
       setIsLive(false);
       setStreamStatus("Stopped");
@@ -288,6 +288,8 @@ export default function ControlPage() {
       socket.off("control:background");
       socket.off("stream:overlayToggled");
       socket.off("stream:overlayPosition");
+      socket.off("display:teleprompterFontSize");
+      socket.off("display:projectorFontSize");
       socket.off("mobile-camera:joined");
       socket.off("mobile-camera:offer");
       socket.off("mobile-camera:candidate");
@@ -298,8 +300,8 @@ export default function ControlPage() {
 
   const EMPTY_SONG: Song = { id: "", title: "No Song", artist: "", key: "C", tempo: 0, currentSection: "", slides: [{ id: "empty", section: "", text: "" }], favorite: false };
   const activeSong = useMemo(() => songs.find((song) => song.id === activeSongId) ?? songs[0] ?? EMPTY_SONG, [activeSongId, songs]);
-  const activeCamera = useMemo(() => cameras.find((c) => c.id === activeCameraId) ?? cameras[0], [activeCameraId, cameras]);
-  const previewCamera = useMemo(() => cameras.find((c) => c.id === previewCameraId) ?? cameras[1] ?? cameras[0], [previewCameraId, cameras]);
+  const activeCamera = useMemo(() => cameras.find((c) => c.id === activeCameraId) ?? cameras[0] ?? { id: "", name: "No Camera", protocol: "", ipAddress: "", streamUrl: "", status: "offline", supportsPTZ: false }, [activeCameraId, cameras]);
+  const previewCamera = useMemo(() => cameras.find((c) => c.id === previewCameraId) ?? cameras[1] ?? cameras[0] ?? { id: "", name: "No Camera", protocol: "", ipAddress: "", streamUrl: "", status: "offline", supportsPTZ: false }, [previewCameraId, cameras]);
 
   const triggerScene = (scene: SceneMode) => {
     setActiveScene(scene);
@@ -434,7 +436,12 @@ export default function ControlPage() {
   };
 
   const handleAddCamera = (camera: Camera, stream?: MediaStream) => {
-    setCameras((prev) => (prev.some((item) => item.id === camera.id) ? prev : [...prev, camera]));
+    setCameras((prev) => {
+      if (prev.some((item) => item.id === camera.id)) return prev;
+      return [...prev, camera];
+    });
+    setActiveCameraId((current) => current || camera.id);
+    setPreviewCameraId((current) => current || camera.id);
     if (stream) {
       camStore.setLocalStream(camera.id, stream);
     }
@@ -1004,6 +1011,38 @@ export default function ControlPage() {
               Sync the latest control state to all connected displays.
             </p>
             <div className="display-connect-actions">
+              <div style={{ display: "grid", gap: 10, marginBottom: 12 }}>
+                <label style={{ display: "grid", gap: 4, fontSize: 12 }}>
+                  Teleprompter font size
+                  <input
+                    type="number"
+                    min={24}
+                    max={120}
+                    value={teleprompterFontSize}
+                    onChange={(e) => {
+                      const next = Math.min(120, Math.max(24, Number(e.target.value) || 24));
+                      setTeleprompterFontSize(next);
+                      socket.emit("display:teleprompterFontSize", next);
+                    }}
+                    style={{ width: 80, padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", color: "var(--text)" }}
+                  />
+                </label>
+                <label style={{ display: "grid", gap: 4, fontSize: 12 }}>
+                  Projector font size
+                  <input
+                    type="number"
+                    min={24}
+                    max={120}
+                    value={projectorFontSize}
+                    onChange={(e) => {
+                      const next = Math.min(120, Math.max(24, Number(e.target.value) || 24));
+                      setProjectorFontSize(next);
+                      socket.emit("display:projectorFontSize", next);
+                    }}
+                    style={{ width: 80, padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", color: "var(--text)" }}
+                  />
+                </label>
+              </div>
               <button type="button" className="button primary" onClick={reconnectDisplays}>
                 Reconnect Displays
               </button>

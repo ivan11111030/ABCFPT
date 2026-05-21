@@ -29,6 +29,11 @@ export default function TeleprompterPage() {
       if (serverState.songs?.length) songStore.mergeFromServer(serverState.songs);
       if (serverState.currentSongId) setCurrentSongId(serverState.currentSongId);
       if (serverState.currentSlide !== undefined) setSlideIndex(serverState.currentSlide);
+      if (serverState.teleprompterFontSize !== undefined) setFontSize(serverState.teleprompterFontSize);
+    });
+
+    socket.on("display:teleprompterFontSize", (size: number) => {
+      setFontSize(size);
     });
 
     // Live updates
@@ -75,7 +80,6 @@ export default function TeleprompterPage() {
           <button onClick={() => setDarkMode((s) => !s)} className="button subtle" style={{ fontSize: 12 }}>
             {darkMode ? "☀️" : "🌙"}
           </button>
-          <input type="range" min="28" max="70" value={fontSize} onChange={(e) => setFontSize(Number(e.target.value))} title="Font size" style={{ width: 80 }} />
         </div>
       </div>
       {/* Invisible hover trigger at top */}

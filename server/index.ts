@@ -34,27 +34,6 @@ type Camera = {
 
 /* ── Shared in-memory state ─────────────────────────── */
 
-const defaultSongs: Song[] = [
-  {
-    id: "song-001", title: "Abide in the Light", artist: "ABCF Worship",
-    key: "C", tempo: 78, currentSection: "Verse 1", favorite: true,
-    slides: [
-      { id: "slide-001", section: "Verse 1", text: "Abide in the light, we will sing tonight." },
-      { id: "slide-002", section: "Chorus", text: "Let every heart proclaim Your name." },
-      { id: "slide-003", section: "Bridge", text: "Spirit move and stir our praise." },
-    ],
-  },
-  {
-    id: "song-002", title: "Grace Like Rain", artist: "ABCF Worship",
-    key: "G", tempo: 92, currentSection: "Chorus", favorite: false,
-    slides: [
-      { id: "slide-004", section: "Verse 1", text: "Falling like rain, Your love comes down." },
-      { id: "slide-005", section: "Chorus", text: "Grace like rain, Holy Fire." },
-      { id: "slide-006", section: "Tag", text: "We stand in awe of who You are." },
-    ],
-  },
-];
-
 /* ── Persistent song file on disk ───────────────────── */
 const CLOUD_SONGS_PATH = path.join(__dirname, "cloud_songs.json");
 
@@ -84,24 +63,23 @@ function saveCloudSongs(data: CloudData) {
   }
 }
 
-// Initialize songs from cloud file if it exists, otherwise use defaults
+// Initialize songs from cloud file if it exists, otherwise start with an empty song set
 const initialCloudData = loadCloudSongs();
-const initialSongs = initialCloudData.songs.length > 0 ? initialCloudData.songs : defaultSongs;
+const initialSongs = initialCloudData.songs.length > 0 ? initialCloudData.songs : [];
 
 const state = {
   songs: initialSongs as Song[],
-  currentSongId: initialSongs[0]?.id || "song-001",
+  currentSongId: initialSongs[0]?.id || "",
   currentSlide: 0,
   currentScene: "worship" as SceneMode,
-  cameras: [
-    { id: "camera-01", name: "Stage Wide Camera", protocol: "RTSP", ipAddress: "192.168.1.101", streamUrl: "rtsp://192.168.1.101/live", status: "online", supportsPTZ: false, signalStrength: "good" },
-    { id: "camera-02", name: "Lead Singer Close", protocol: "NDI", ipAddress: "192.168.1.102", streamUrl: "ndi://lead-singer", status: "online", supportsPTZ: true, signalStrength: "good" },
-  ] as Camera[],
-  activeCameraId: "camera-01",
+  cameras: [] as Camera[],
+  activeCameraId: "",
   cameraTransition: "cut" as CameraTransition,
   isLive: false,
   overlayEnabled: true,
   overlayPosition: { x: 0, y: 75, width: 100 } as OverlayPosition,
+  teleprompterFontSize: 42,
+  projectorFontSize: 42,
   standby: false,
   background: { type: "color" as "color" | "image", value: "#000000" },
   sceneType: "worship" as string,
@@ -527,7 +505,15 @@ io.on("connection", (socket: Socket) => {
     state.overlayPosition = pos;
     io.emit("stream:overlayPosition", pos);
   });
+  socket.on("display:teleprompterFontSize", (size: number) => {
+    state.teleprompterFontSize = size;
+    io.emit("display:teleprompterFontSize", size);
+  });
 
+  socket.on("display:projectorFontSize", (size: number) => {
+    state.projectorFontSize = size;
+    io.emit("display:projectorFontSize", size);
+  });
   socket.on("stream:overlayOpacity", (opacity: number) => {
     (state as any).overlayOpacity = opacity;
     io.emit("stream:overlayOpacity", opacity);
