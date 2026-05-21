@@ -17,6 +17,7 @@ type TopBarProps = {
 
 export function TopBar({ title, badge, currentSong, isLive, cameraCount, onlineCameraCount, activeScene, showRightPanel, onToggleRightPanel }: TopBarProps) {
   const [elapsed, setElapsed] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     if (!isLive) {
@@ -26,6 +27,27 @@ export function TopBar({ title, badge, currentSong, isLive, cameraCount, onlineC
     const interval = setInterval(() => setElapsed((t) => t + 1), 1000);
     return () => clearInterval(interval);
   }, [isLive]);
+
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", onChange);
+    // Initialize state
+    setIsFullscreen(Boolean(document.fullscreenElement));
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (e) {
+      // ignore failures (user gesture required in some browsers)
+      // Could surface UI feedback here if desired.
+    }
+  };
 
   const minutes = String(Math.floor(elapsed / 60)).padStart(2, "0");
   const seconds = String(elapsed % 60).padStart(2, "0");
@@ -66,6 +88,9 @@ export function TopBar({ title, badge, currentSong, isLive, cameraCount, onlineC
             {showRightPanel ? "Hide Panel ◀" : "Show Panel ▶"}
           </button>
         )}
+        <button type="button" className="button subtle topbar-toggle" onClick={toggleFullscreen} aria-pressed={isFullscreen} aria-label={isFullscreen ? "Exit full screen" : "Enter full screen"}>
+          {isFullscreen ? "Exit Full Screen ✕" : "Full Screen ⛶"}
+        </button>
         <span className={`status-pill ${badge === "Live Sync" ? "active" : "offline"}`}>
           {badge === "Live Sync" ? "🟢" : "🔴"} {badge}
         </span>
