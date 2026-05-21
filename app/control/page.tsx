@@ -88,6 +88,7 @@ export default function ControlPage() {
   const streamCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const animFrameRef = useRef<number>(0);
+  const pendingStreamStartRef = useRef(false);
 
   const router = useRouter();
 
@@ -494,10 +495,18 @@ export default function ControlPage() {
       return;
     }
 
+    const normalizedRtmpUrl = rtmpUrl.trim();
+    const normalizedStreamKey = streamKey.trim().replace(/^\/+/, "");
+
+    if (!normalizedStreamKey) {
+      setStreamStatus("Error: Stream Key is required");
+      return;
+    }
+
     setStreamStatus("Connecting...");
 
     // Tell server to start ffmpeg process first
-    socket.emit("stream:start", { rtmpUrl, streamKey, scene: activeScene, cameraId: activeCameraId });
+    socket.emit("stream:start", { rtmpUrl: normalizedRtmpUrl, streamKey: normalizedStreamKey, scene: activeScene, cameraId: activeCameraId });
 
     // Build a canvas that composites the program video + overlays
     const WIDTH = 1280;

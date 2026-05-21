@@ -126,7 +126,10 @@ function stopFfmpeg() {
 function startFfmpeg(rtmpUrl: string, streamKey: string): { ok: boolean; error?: string } {
   stopFfmpeg(); // clean up previous
 
-  const fullUrl = `${rtmpUrl}${streamKey}`;
+  const normalizedRtmpUrl = rtmpUrl.trim();
+  const normalizedStreamKey = streamKey.trim().replace(/^\/+/, "");
+  const finalRtmpUrl = normalizedRtmpUrl.endsWith("/") ? normalizedRtmpUrl : `${normalizedRtmpUrl}/`;
+  const fullUrl = `${finalRtmpUrl}${normalizedStreamKey}`;
   streamTargetUrl = fullUrl;
 
   // Validate URL format
@@ -463,12 +466,15 @@ io.on("connection", (socket: Socket) => {
 
   /* ── Stream events ───────────────────────────────── */
   socket.on("stream:start", (payload: { rtmpUrl?: string; streamKey?: string; scene?: string; cameraId?: string }) => {
-    if (!payload.rtmpUrl || !payload.streamKey) {
+    const rtmpUrl = payload.rtmpUrl?.trim() || "";
+    const streamKey = payload.streamKey?.trim().replace(/^\/+/, "") || "";
+
+    if (!rtmpUrl || !streamKey) {
       socket.emit("stream:error", { message: "RTMP URL and Stream Key are required." });
       return;
     }
 
-    const result = startFfmpeg(payload.rtmpUrl, payload.streamKey);
+    const result = startFfmpeg(rtmpUrl, streamKey);
     if (!result.ok) {
       socket.emit("stream:error", { message: result.error || "Failed to start stream" });
       return;
