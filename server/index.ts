@@ -465,29 +465,44 @@ io.on("connection", (socket: Socket) => {
   });
 
   /* ── Stream events ───────────────────────────────── */
-  socket.on("stream:start", (payload: { rtmpUrl?: string; streamKey?: string; scene?: string; cameraId?: string }) => {
-    const rtmpUrl = payload.rtmpUrl?.trim() || "";
-    const streamKey = payload.streamKey?.trim().replace(/^\/+/, "") || "";
+  socket.on(
+    "stream:start",
+    (
+      payload: { rtmpUrl?: string; streamKey?: string; scene?: string; cameraId?: string },
+      callback: (result: { ok: boolean; message?: string; status?: string }) => void
+    ) => {
+      const rtmpUrl = payload.rtmpUrl?.trim() || "";
+      const streamKey = payload.streamKey?.trim().replace(/^\/+/, "") || "";
 
-    if (!rtmpUrl || !streamKey) {
-      socket.emit("stream:error", { message: "RTMP URL and Stream Key are required." });
-      return;
+      if (!rtmpUrl || !streamKey) {
+        const message = "RTMP URL and Stream Key are required.";
+        socket.emit("stream:error", { message });
+        callback({ ok: false, message });
+        return;
+      }
+
+      console.log("[Stream] stream:start request received", { rtmpUrl, cameraId: payload.cameraId });
+      const result = startFfmpeg(rtmpUrl, streamKey);
+      if (!result.ok) {
+        const message = result.error || "Failed to start stream";
+        socket.emit("stream:error", { message });
+        callback({ ok: false, message });
+        return;
+      }
+
+      state.isLive = true;
+      console.log(`[Stream] Live → ${rtmpUrl}***`);
+      io.emit("stream:started", { scene: payload.scene, cameraId: payload.cameraId, status: "live" });
+      callback({ ok: true, status: "live" });
     }
-
-    const result = startFfmpeg(rtmpUrl, streamKey);
-    if (!result.ok) {
-      socket.emit("stream:error", { message: result.error || "Failed to start stream" });
-      return;
-    }
-
-    state.isLive = true;
-    console.log(`[Stream] Live → ${payload.rtmpUrl}***`);
-    io.emit("stream:started", { scene: payload.scene, cameraId: payload.cameraId, status: "live" });
-  });
+  );
 
   // Binary video data from client MediaRecorder
   socket.on("stream:data", (chunk: Buffer | ArrayBuffer) => {
-    if (!ffmpegProcess || !ffmpegProcess.stdin?.writable) return;
+    if (!ffmpegProcess || !ffmpegProcess.stdin?.writable) {
+      console.warn("[Stream] Dropping stream data: ffmpeg not ready");
+      return;
+    }
     try {
       const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
       ffmpegProcess.stdin.write(buf);

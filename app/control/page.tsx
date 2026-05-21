@@ -486,7 +486,7 @@ export default function ControlPage() {
       setStreamStatus("Error: Socket not connected to server. Reconnecting...");
       socket.once("connect", () => {
         setStreamStatus("Connected. Starting stream...");
-        socket.emit("stream:start", { rtmpUrl, streamKey, scene: activeScene, cameraId: activeCameraId });
+        emitStreamStart();
       });
       socket.once("connect_error", () => {
         setStreamStatus("Error: Cannot connect to server. Check your connection.");
@@ -495,6 +495,10 @@ export default function ControlPage() {
       return;
     }
 
+    emitStreamStart();
+  };
+
+  const emitStreamStart = () => {
     const normalizedRtmpUrl = rtmpUrl.trim();
     const normalizedStreamKey = streamKey.trim().replace(/^\/+/, "");
 
@@ -505,9 +509,22 @@ export default function ControlPage() {
 
     setStreamStatus("Connecting...");
 
-    // Tell server to start ffmpeg process first
-    socket.emit("stream:start", { rtmpUrl: normalizedRtmpUrl, streamKey: normalizedStreamKey, scene: activeScene, cameraId: activeCameraId });
+    socket.emit(
+      "stream:start",
+      { rtmpUrl: normalizedRtmpUrl, streamKey: normalizedStreamKey, scene: activeScene, cameraId: activeCameraId },
+      (response: { ok: boolean; message?: string; status?: string }) => {
+        if (!response || !response.ok) {
+          setStreamStatus(`Error: ${response?.message || "Failed to start stream"}`);
+          return;
+        }
 
+        setStreamStatus("Starting encoder...");
+        startRecording();
+      }
+    );
+  };
+
+  const startRecording = () => {
     // Build a canvas that composites the program video + overlays
     const WIDTH = 1280;
     const HEIGHT = 720;
