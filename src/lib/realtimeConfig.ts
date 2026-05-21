@@ -12,7 +12,11 @@ function parseIceServersFromJson(value: string | undefined): RTCIceServer[] {
 }
 
 export function getSocketServerUrl(): string {
-  return process.env.NEXT_PUBLIC_SOCKET_SERVER_URL?.trim() || DEFAULT_SOCKET_SERVER_URL;
+  return (
+    process.env.NEXT_PUBLIC_SOCKET_SERVER_URL?.trim() ||
+    process.env.SOCKET_SERVER_URL?.trim() ||
+    DEFAULT_SOCKET_SERVER_URL
+  );
 }
 
 export function getIceServers(): RTCIceServer[] {
