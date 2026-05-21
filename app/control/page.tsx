@@ -938,7 +938,13 @@ export default function ControlPage() {
             </div>
           </div>
 
-          <LyricsPreviewPanel song={activeSong} currentSlide={currentSlide} onJumpToSlide={jumpToSection} />
+          <LyricsPreviewPanel
+            song={activeSong}
+            currentSlide={currentSlide}
+            overlayEnabled={overlayEnabled}
+            onToggleOverlay={toggleOverlay}
+            onJumpToSlide={jumpToSection}
+          />
         </div>
 
         {/* RIGHT RESIZE HANDLE */}
@@ -947,7 +953,16 @@ export default function ControlPage() {
         {/* RIGHT: PRODUCTION CONTROLS */}
         {showRightPanel && (
         <div className="control-right">
-          <CameraPreviewPanel cameras={cameras} activeCameraId={previewCameraId} programCameraId={activeCameraId} onSelectCamera={selectCamera} onRemoveCamera={handleRemoveCamera} onHoverCamera={(id) => id && setPreviewCameraId(id)} />
+          <CameraPreviewPanel
+            cameras={cameras}
+            activeCameraId={previewCameraId}
+            programCameraId={activeCameraId}
+            overlayEnabled={overlayEnabled}
+            onToggleOverlay={toggleOverlay}
+            onSelectCamera={selectCamera}
+            onRemoveCamera={handleRemoveCamera}
+            onHoverCamera={(id) => id && setPreviewCameraId(id)}
+          />
           <CameraTransitionPanel transition={cameraTransition} onChangeTransition={changeTransition} />
           <SceneControlPanel activeSceneType={activeSceneType} onSceneChange={triggerSceneType} onEditScene={handleEditScene} onOpenLibrary={() => setShowSceneLibrary(true)} />
           <LivestreamStudioPanel

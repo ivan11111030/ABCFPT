@@ -4,12 +4,14 @@ type CameraPreviewPanelProps = {
   cameras: Camera[];
   activeCameraId: string;
   programCameraId?: string;
+  overlayEnabled: boolean;
+  onToggleOverlay: () => void;
   onSelectCamera: (cameraId: string) => void;
   onHoverCamera?: (cameraId: string) => void;
   onRemoveCamera?: (cameraId: string) => void;
 };
 
-export function CameraPreviewPanel({ cameras, activeCameraId, programCameraId, onSelectCamera, onHoverCamera, onRemoveCamera }: CameraPreviewPanelProps) {
+export function CameraPreviewPanel({ cameras, activeCameraId, programCameraId, overlayEnabled, onToggleOverlay, onSelectCamera, onHoverCamera, onRemoveCamera }: CameraPreviewPanelProps) {
   const getTallyClass = (cameraId: string) => {
     if (programCameraId && cameraId === programCameraId) return "camera-card tally-program";
     if (cameraId === activeCameraId) return "camera-card tally-preview";
@@ -18,9 +20,14 @@ export function CameraPreviewPanel({ cameras, activeCameraId, programCameraId, o
 
   return (
     <section className="camera-panel">
-      <div className="panel-header">
-        <p>Cameras</p>
-        <span className="muted" style={{ fontSize: 12, color: "var(--muted)" }}>{cameras.filter(c => c.status === "online").length}/{cameras.length} online</span>
+      <div className="panel-header camera-panel-header">
+        <div>
+          <p>Cameras</p>
+          <span className="muted" style={{ fontSize: 12, color: "var(--muted)" }}>{cameras.filter((c) => c.status === "online").length}/{cameras.length} online</span>
+        </div>
+        <button type="button" className={`button outline ${overlayEnabled ? "active" : ""}`} onClick={onToggleOverlay}>
+          {overlayEnabled ? "Overlay ON" : "Overlay OFF"}
+        </button>
       </div>
       <div className="camera-grid">
         {cameras.map((camera) => (
@@ -60,6 +67,7 @@ export function CameraPreviewPanel({ cameras, activeCameraId, programCameraId, o
                   </span>
                   {programCameraId === camera.id && <span className="status" style={{ background: "rgba(239,68,68,0.2)", color: "#fca5a5" }}>PGM</span>}
                   {activeCameraId === camera.id && programCameraId !== camera.id && <span className="status" style={{ background: "rgba(34,197,94,0.15)", color: "#bbf7d0" }}>PVW</span>}
+                  {overlayEnabled && programCameraId === camera.id && <span className="status" style={{ background: "rgba(59,130,246,0.15)", color: "#bfdbfe" }}>LYRICS</span>}
                 </div>
               </div>
             </button>
