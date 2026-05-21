@@ -6,12 +6,14 @@ type CameraPreviewPanelProps = {
   programCameraId?: string;
   overlayEnabled: boolean;
   onToggleOverlay: () => void;
+  onToggleFullScreen?: () => void;
+  isFullScreen?: boolean;
   onSelectCamera: (cameraId: string) => void;
   onHoverCamera?: (cameraId: string) => void;
   onRemoveCamera?: (cameraId: string) => void;
 };
 
-export function CameraPreviewPanel({ cameras, activeCameraId, programCameraId, overlayEnabled, onToggleOverlay, onSelectCamera, onHoverCamera, onRemoveCamera }: CameraPreviewPanelProps) {
+export function CameraPreviewPanel({ cameras, activeCameraId, programCameraId, overlayEnabled, onToggleOverlay, onToggleFullScreen, isFullScreen, onSelectCamera, onHoverCamera, onRemoveCamera }: CameraPreviewPanelProps) {
   const getTallyClass = (cameraId: string) => {
     if (programCameraId && cameraId === programCameraId) return "camera-card tally-program";
     if (cameraId === activeCameraId) return "camera-card tally-preview";
@@ -28,6 +30,11 @@ export function CameraPreviewPanel({ cameras, activeCameraId, programCameraId, o
         <button type="button" className={`button outline ${overlayEnabled ? "active" : ""}`} onClick={onToggleOverlay}>
           {overlayEnabled ? "Overlay ON" : "Overlay OFF"}
         </button>
+        {onToggleFullScreen && (
+          <button type="button" className={`button outline ${isFullScreen ? "active" : ""}`} onClick={onToggleFullScreen}>
+            {isFullScreen ? "Exit Full Screen" : "Full Screen"}
+          </button>
+        )}
       </div>
       <div className="camera-grid">
         {cameras.map((camera) => (

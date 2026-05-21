@@ -6,10 +6,12 @@ type LyricsPreviewPanelProps = {
   currentSlide: number;
   overlayEnabled: boolean;
   onToggleOverlay: () => void;
+  onToggleFullScreen?: () => void;
+  isFullScreen?: boolean;
   onJumpToSlide?: (index: number) => void;
 };
 
-export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggleOverlay, onJumpToSlide }: LyricsPreviewPanelProps) {
+export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggleOverlay, onToggleFullScreen, isFullScreen, onJumpToSlide }: LyricsPreviewPanelProps) {
   const [thumbnailView, setThumbnailView] = useState(true);
 
   const currentText = song.slides[currentSlide]?.text ?? "";
@@ -34,6 +36,11 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
           <button type="button" className={`button outline ${overlayEnabled ? "active" : ""}`} onClick={onToggleOverlay}>
             {overlayEnabled ? "Overlay ON" : "Overlay OFF"}
           </button>
+          {onToggleFullScreen && (
+            <button type="button" className={`button outline ${isFullScreen ? "active" : ""}`} onClick={onToggleFullScreen}>
+              {isFullScreen ? "Exit Full Screen" : "Full Screen"}
+            </button>
+          )}
         </div>
       </div>
 

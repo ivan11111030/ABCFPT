@@ -80,6 +80,9 @@ export default function ControlPage() {
   const [overlayOpacity, setOverlayOpacity] = useState(100);
   const [overlayHeight, setOverlayHeight] = useState(25);
   const [showManualControls, setShowManualControls] = useState(false);
+  const [fullScreenTarget, setFullScreenTarget] = useState<"none" | "lyrics" | "camera">("none");
+  const isLyricsFullScreen = fullScreenTarget === "lyrics";
+  const isCameraFullScreen = fullScreenTarget === "camera";
   const [canvaOverlayImage, setCanvaOverlayImage] = useState<string | null>(null);
   const draggingRef = useRef<"left" | "right" | null>(null);
   const startXRef = useRef(0);
@@ -714,6 +717,10 @@ export default function ControlPage() {
     socket.emit("control:slide", index);
   };
 
+  const toggleFullScreen = (target: "lyrics" | "camera") => {
+    setFullScreenTarget((prev) => (prev === target ? "none" : target));
+  };
+
   const handleNextSong = () => {
     const currentIndex = songs.findIndex((s) => s.id === activeSongId);
     if (currentIndex < songs.length - 1) {
@@ -755,6 +762,17 @@ export default function ControlPage() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   });
+
+  useEffect(() => {
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && fullScreenTarget !== "none") {
+        e.preventDefault();
+        setFullScreenTarget("none");
+      }
+    };
+    window.addEventListener("keydown", onEsc);
+    return () => window.removeEventListener("keydown", onEsc);
+  }, [fullScreenTarget]);
 
   const onMouseDown = useCallback((side: "left" | "right", e: React.MouseEvent) => {
     e.preventDefault();
@@ -894,64 +912,19 @@ export default function ControlPage() {
               TAKE <kbd>Space</kbd>
             </button>
 
-            {/* OVERLAY LAYOUT CONTROLS */}
-            <div className="overlay-controls">
-              <div className="overlay-controls-row">
-                <span className="overlay-controls-label">Lyrics Overlay</span>
-                <button type="button" className={`button ${overlayEnabled ? "success" : "outline"}`} style={{ padding: "6px 12px", fontSize: 12 }} onClick={toggleOverlay}>
-                  {overlayEnabled ? "ON" : "OFF"}
-                </button>
-              </div>
-              {overlayEnabled && (
-                <>
-                  <div className="overlay-presets">
-                    {(["lower-third", "top-bar", "pip-corner", "full"] as const).map((l) => (
-                      <button key={l} type="button" className={`button ${overlayLayout === l ? "primary" : "subtle"}`} style={{ padding: "6px 10px", fontSize: 11 }} onClick={() => changeOverlayLayout(l)}>
-                        {l === "lower-third" ? "Lower Third" : l === "top-bar" ? "Top Bar" : l === "pip-corner" ? "PIP Corner" : "Full"}
-                      </button>
-                    ))}
-                    {overlayLayout === "custom" && <span style={{ fontSize: 11, color: "var(--accent)" }}>Custom (drag to move)</span>}
-                  </div>
-                  <button
-                    type="button"
-                    className={`button ${showManualControls ? "primary" : "subtle"}`}
-                    style={{ padding: "6px 10px", fontSize: 11, marginTop: 4, width: "100%" }}
-                    onClick={() => setShowManualControls(!showManualControls)}
-                  >
-                    {showManualControls ? "▲ Hide" : "▼ Show"} Manual Adjustments
-                  </button>
-                  {showManualControls && (
-                    <OverlayManualControls
-                      position={overlayPos}
-                      onPositionChange={(pos) => {
-                        setOverlayLayout("custom");
-                        setOverlayPos(pos);
-                        socket.emit("stream:overlayPosition", pos);
-                      }}
-                      opacity={overlayOpacity}
-                      onOpacityChange={(v) => {
-                        setOverlayOpacity(v);
-                        socket.emit("stream:overlayOpacity", v);
-                      }}
-                      height={overlayHeight}
-                      onHeightChange={(v) => {
-                        setOverlayHeight(v);
-                        socket.emit("stream:overlayHeight", v);
-                      }}
-                    />
-                  )}
-                </>
-              )}
-            </div>
           </div>
 
-          <LyricsPreviewPanel
-            song={activeSong}
-            currentSlide={currentSlide}
-            overlayEnabled={overlayEnabled}
-            onToggleOverlay={toggleOverlay}
-            onJumpToSlide={jumpToSection}
-          />
+          {!isLyricsFullScreen && (
+            <LyricsPreviewPanel
+              song={activeSong}
+              currentSlide={currentSlide}
+              overlayEnabled={overlayEnabled}
+              onToggleOverlay={toggleOverlay}
+              onJumpToSlide={jumpToSection}
+              onToggleFullScreen={() => toggleFullScreen("lyrics")}
+              isFullScreen={isLyricsFullScreen}
+            />
+          )}
         </div>
 
         {/* RIGHT RESIZE HANDLE */}
@@ -960,16 +933,20 @@ export default function ControlPage() {
         {/* RIGHT: PRODUCTION CONTROLS */}
         {showRightPanel && (
         <div className="control-right">
-          <CameraPreviewPanel
-            cameras={cameras}
-            activeCameraId={previewCameraId}
-            programCameraId={activeCameraId}
-            overlayEnabled={overlayEnabled}
-            onToggleOverlay={toggleOverlay}
-            onSelectCamera={selectCamera}
-            onRemoveCamera={handleRemoveCamera}
-            onHoverCamera={(id) => id && setPreviewCameraId(id)}
-          />
+          {!isCameraFullScreen && (
+            <CameraPreviewPanel
+              cameras={cameras}
+              activeCameraId={previewCameraId}
+              programCameraId={activeCameraId}
+              overlayEnabled={overlayEnabled}
+              onToggleOverlay={toggleOverlay}
+              onSelectCamera={selectCamera}
+              onRemoveCamera={handleRemoveCamera}
+              onHoverCamera={(id) => id && setPreviewCameraId(id)}
+              onToggleFullScreen={() => toggleFullScreen("camera")}
+              isFullScreen={isCameraFullScreen}
+            />
+          )}
           <CameraTransitionPanel transition={cameraTransition} onChangeTransition={changeTransition} />
           <SceneControlPanel activeSceneType={activeSceneType} onSceneChange={triggerSceneType} onEditScene={handleEditScene} onOpenLibrary={() => setShowSceneLibrary(true)} />
           <LivestreamStudioPanel
@@ -1058,6 +1035,41 @@ export default function ControlPage() {
         </div>
         )}
       </div>
+
+      {fullScreenTarget !== "none" && (
+        <div className="full-screen-overlay" role="dialog" aria-modal="true">
+          <div className="full-screen-overlay-bar">
+            <div>{fullScreenTarget === "lyrics" ? "Lyrics Full Screen" : "Camera Full Screen"}</div>
+            <button type="button" className="button subtle" onClick={() => setFullScreenTarget("none")}>Exit Full Screen</button>
+          </div>
+          <div className="full-screen-overlay-content">
+            {fullScreenTarget === "lyrics" ? (
+              <LyricsPreviewPanel
+                song={activeSong}
+                currentSlide={currentSlide}
+                overlayEnabled={overlayEnabled}
+                onToggleOverlay={toggleOverlay}
+                onJumpToSlide={jumpToSection}
+                onToggleFullScreen={() => toggleFullScreen("lyrics")}
+                isFullScreen
+              />
+            ) : (
+              <CameraPreviewPanel
+                cameras={cameras}
+                activeCameraId={previewCameraId}
+                programCameraId={activeCameraId}
+                overlayEnabled={overlayEnabled}
+                onToggleOverlay={toggleOverlay}
+                onSelectCamera={selectCamera}
+                onRemoveCamera={handleRemoveCamera}
+                onHoverCamera={(id) => id && setPreviewCameraId(id)}
+                onToggleFullScreen={() => toggleFullScreen("camera")}
+                isFullScreen
+              />
+            )}
+          </div>
+        </div>
+      )}
 
       {/* BOTTOM CONTROL BAR */}
       <div className="control-bar">
