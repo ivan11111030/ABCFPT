@@ -27,9 +27,7 @@ export function CameraPreviewPanel({ cameras, activeCameraId, programCameraId, o
           <p>Cameras</p>
           <span className="muted" style={{ fontSize: 12, color: "var(--muted)" }}>{cameras.filter((c) => c.status === "online").length}/{cameras.length} online</span>
         </div>
-        <button type="button" className={`button outline ${overlayEnabled ? "active" : ""}`} onClick={onToggleOverlay}>
-          {overlayEnabled ? "Overlay ON" : "Overlay OFF"}
-        </button>
+        {/* overlay toggle removed per user request */}
         {onToggleFullScreen && (
           <button type="button" className={`button outline ${isFullScreen ? "active" : ""}`} onClick={onToggleFullScreen}>
             {isFullScreen ? "Exit Full Screen" : "Full Screen"}
@@ -74,7 +72,7 @@ export function CameraPreviewPanel({ cameras, activeCameraId, programCameraId, o
                   </span>
                   {programCameraId === camera.id && <span className="status" style={{ background: "rgba(239,68,68,0.2)", color: "#fca5a5" }}>PGM</span>}
                   {activeCameraId === camera.id && programCameraId !== camera.id && <span className="status" style={{ background: "rgba(34,197,94,0.15)", color: "#bbf7d0" }}>PVW</span>}
-                  {overlayEnabled && programCameraId === camera.id && <span className="status" style={{ background: "rgba(59,130,246,0.15)", color: "#bfdbfe" }}>LYRICS</span>}
+                  {/* overlay badge removed per user request */}
                 </div>
               </div>
             </button>

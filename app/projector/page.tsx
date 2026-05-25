@@ -242,7 +242,7 @@ export default function ProjectorPage() {
                   fontFamily: currentSlide.textStyle?.fontFamily,
                   fontSize: currentSlide.textStyle?.fontSize ? `${currentSlide.textStyle.fontSize}px` : `${projectorFontSize}px`,
                   color: currentSlide.textStyle?.color ?? "#fff",
-                  textAlign: currentSlide.textStyle?.align ?? "center",
+                  textAlign: "center",
                   fontWeight: currentSlide.textStyle?.bold ? 700 : undefined,
                   fontStyle: currentSlide.textStyle?.italic ? "italic" : undefined,
                 }}

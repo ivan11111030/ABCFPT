@@ -1100,7 +1100,7 @@ export default function ControlPage() {
           Next Slide ▶ <kbd>→</kbd>
         </button>
         <button type="button" className="button success" onClick={handleNextSong}>
-          Next Song <kbd>S</kbd>
+          Advance Setlist <kbd>S</kbd>
         </button>
         <button type="button" className="button subtle" onClick={() => triggerScene(activeScene)}>
           Scene: {activeSceneType}

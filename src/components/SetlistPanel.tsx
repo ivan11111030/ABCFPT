@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState, type DragEvent, useEffect } from "react";
-import type { Song, SetlistItem } from "@/src/types/production";
+import type { Song } from "@/src/types/production";
 import * as songStore from "@/src/lib/songStore";
-import * as setlistStore from "@/src/lib/setlistStore";
+import * as setlistMembershipStore from "@/src/lib/setlistMembershipStore";
 
 type SetlistPanelProps = {
   songs: Song[];
@@ -17,27 +17,23 @@ export function SetlistPanel({ songs, activeSongId, onSelectSong, onReorder }: S
   const [search, setSearch] = useState("");
   const [cloudBusy, setCloudBusy] = useState(false);
   const [cloudMsg, setCloudMsg] = useState("");
-  const [setlistItems, setSetlistItems] = useState<SetlistItem[]>(() => setlistStore.getSetlist());
+  const [memberships, setMemberships] = useState(() => setlistMembershipStore.getSetlistItems());
 
-  // Subscribe to setlist store changes
+  // Subscribe to membership store changes
   useEffect(() => {
-    const unsubscribe = setlistStore.subscribe(() => {
-      setSetlistItems(setlistStore.getSetlist());
+    const unsubscribe = setlistMembershipStore.subscribe(() => {
+      setMemberships(setlistMembershipStore.getSetlistItems());
     });
     return unsubscribe;
   }, []);
 
-  // Get the actual songs for items in setlist
+  // Get the actual songs for items in setlist (only include items with category 'song')
   const setlistSongs = useMemo(() => {
-    return setlistItems
-      .map(item => songs.find(s => s.id === item.songId))
-      .filter((s): s is Song => s !== undefined)
-      .sort((a, b) => {
-        const aPos = setlistItems.find(item => item.songId === a.id)?.position ?? 0;
-        const bPos = setlistItems.find(item => item.songId === b.id)?.position ?? 0;
-        return aPos - bPos;
-      });
-  }, [setlistItems, songs]);
+    const songMemberships = memberships.filter((m) => m.itemCategory === "song").sort((a, b) => a.position - b.position);
+    return songMemberships
+      .map((m) => songs.find((s) => s.id === m.itemId))
+      .filter((s): s is Song => s !== undefined);
+  }, [memberships, songs]);
 
   const filteredSongs = useMemo(() => {
     if (!search.trim()) return setlistSongs;
@@ -61,12 +57,15 @@ export function SetlistPanel({ songs, activeSongId, onSelectSong, onReorder }: S
     event.preventDefault();
     const sourceId = event.dataTransfer.getData("text/plain");
     if (sourceId && sourceId !== targetId) {
-      const reordered = setlistSongs.map(s => s.id);
-      const sourceIdx = reordered.indexOf(sourceId);
-      const targetIdx = reordered.indexOf(targetId);
+      // compute target position based on current memberships order
+      const songMemberships = memberships.filter((m) => m.itemCategory === "song").sort((a, b) => a.position - b.position);
+      const reorderedIds = songMemberships.map((m) => m.itemId);
+      const sourceIdx = reorderedIds.indexOf(sourceId);
+      const targetIdx = reorderedIds.indexOf(targetId);
       if (sourceIdx >= 0 && targetIdx >= 0) {
-        [reordered[sourceIdx], reordered[targetIdx]] = [reordered[targetIdx], reordered[sourceIdx]];
-        setlistStore.reorderSetlist(reordered);
+        // Determine the final position to move the source membership to
+        const finalPosition = targetIdx;
+        setlistMembershipStore.reorderItems(sourceId, "song", finalPosition);
       }
     }
     setDraggedSongId(null);

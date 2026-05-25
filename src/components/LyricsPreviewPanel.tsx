@@ -33,9 +33,7 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
           <button type="button" className={`button outline ${thumbnailView ? "active" : ""}`} onClick={() => setThumbnailView((prev) => !prev)}>
             {thumbnailView ? "Slide view" : "Notes view"}
           </button>
-          <button type="button" className={`button outline ${overlayEnabled ? "active" : ""}`} onClick={onToggleOverlay}>
-            {overlayEnabled ? "Overlay ON" : "Overlay OFF"}
-          </button>
+          {/* overlay toggle removed per user request */}
           {onToggleFullScreen && (
             <button type="button" className={`button outline ${isFullScreen ? "active" : ""}`} onClick={onToggleFullScreen}>
               {isFullScreen ? "Exit Full Screen" : "Full Screen"}
