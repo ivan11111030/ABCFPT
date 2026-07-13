@@ -117,26 +117,8 @@ export default function ControlPage() {
   }, [cameras, activeCameraId, previewCameraId]);
 
   const reconnectDisplays = useCallback(() => {
-    // Emit current state to all connected display clients (projector/teleprompter)
-    socket.emit("state:sync", {
-      songs: songs,
-      currentSongId: activeSongId,
-      currentSlide: currentSlide,
-      currentScene: activeScene,
-      cameras: cameras,
-      activeCameraId: activeCameraId,
-      cameraTransition: cameraTransition,
-      isLive: isLive,
-      overlayEnabled: overlayEnabled,
-      overlayPosition: overlayPos,
-      standby: standby,
-      background: background,
-      sceneType: activeSceneType,
-      sceneConfig: activeSceneConfig,
-      teleprompterFontSize: teleprompterFontSize,
-      projectorFontSize: projectorFontSize,
-    });
-  }, [songs, activeSongId, currentSlide, activeScene, cameras, activeCameraId, cameraTransition, isLive, overlayEnabled, overlayPos, standby, background, activeSceneType, activeSceneConfig, teleprompterFontSize, projectorFontSize]);
+    socket.emit("display:requestSync");
+  }, []);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {

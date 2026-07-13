@@ -557,6 +557,10 @@ io.on("connection", (socket: Socket) => {
     socket.emit("state:sync", state);
   });
 
+  socket.on("display:requestSync", () => {
+    io.emit("state:sync", state);
+  });
+
   socket.on("disconnect", () => {
     const mobileCameraId = socketCameraMap.get(socket.id);
 
