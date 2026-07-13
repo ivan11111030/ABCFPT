@@ -120,7 +120,7 @@ export function SetlistPanel({ songs, activeSongId, onSelectSong, onReorder }: S
       <div className="setlist-items">
         {filteredSongs.length === 0 ? (
           <div style={{ padding: "16px 8px", textAlign: "center", fontSize: 12, color: "var(--muted)" }}>
-            {setlistItems.length === 0 
+            {setlistSongs.length === 0 
               ? "No songs in setlist. Add songs from Song Management."
               : "No matching songs in setlist."
             }
