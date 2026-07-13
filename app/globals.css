@@ -784,18 +784,42 @@ h1, h2, h3, p { margin: 0; }
 .transition-panel {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-1);
+  gap: var(--sp-2);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(7, 15, 31, 0.98));
+  border: 1px solid rgba(79, 195, 247, 0.18);
+  border-radius: 22px;
+  padding: var(--sp-3);
+  box-shadow: 0 28px 60px rgba(0, 0, 0, 0.22);
 }
 
 .transition-buttons {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--sp-1);
 }
 
 .transition-buttons .button {
-  flex: 1;
-  padding: 8px;
-  font-size: var(--font-label);
+  flex: unset;
+  padding: 14px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border-radius: 16px;
+  min-height: 52px;
+}
+
+.transition-buttons .button.primary {
+  background: linear-gradient(135deg, #4fc3f7, #22c55e);
+  color: #0f172a;
+}
+
+.transition-buttons .button.subtle {
+  background: rgba(255, 255, 255, 0.04);
+  color: #dbeafe;
+}
+
+.transition-buttons .button:hover:not(:disabled) {
+  transform: translateY(-1px);
 }
 
 /* ========== LYRICS PANEL ========== */
@@ -983,13 +1007,14 @@ h1, h2, h3, p { margin: 0; }
 
 /* ========== SCENE CONTROL ========== */
 .scene-panel {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: var(--sp-2);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(7, 15, 31, 0.98));
+  border: 1px solid rgba(79, 195, 247, 0.18);
+  border-radius: 22px;
+  padding: var(--sp-3);
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
+  box-shadow: 0 28px 60px rgba(0, 0, 0, 0.22);
 }
 
 .scene-buttons {
@@ -1018,6 +1043,15 @@ h1, h2, h3, p { margin: 0; }
 .scene-button.active {
   background: rgba(34, 197, 94, 0.1);
   border-color: rgba(34, 197, 94, 0.3);
+}
+
+.scene-panel .button {
+  width: 100%;
+}
+
+.scene-panel .standby-action-row {
+  display: grid;
+  gap: var(--sp-2);
 }
 
 /* ========== AUDIO MONITOR ========== */
@@ -1603,24 +1637,19 @@ h1, h2, h3, p { margin: 0; }
   color: #fff;
   text-align: center;
   animation: projector-fade 200ms ease-in;
-  max-width: 90%;
+  max-width: 88%;
   padding: 0 24px;
+  text-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
 }
 
 .projector-section {
-  font-size: clamp(1rem, 1.4vw, 1.5rem);
+  font-size: clamp(1rem, 1.4vw, 1.4rem);
   text-transform: uppercase;
   letter-spacing: 0.22em;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.78);
   margin-top: 1rem;
-}
-
-.projector-section {
-  font-size: var(--font-label);
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
-  color: rgba(255, 255, 255, 0.55);
-  margin-top: 0.5rem;
+  opacity: 0.92;
+  text-shadow: 0 3px 12px rgba(0, 0, 0, 0.4);
 }
 
 @keyframes projector-fade {
@@ -2251,11 +2280,6 @@ h1, h2, h3, p { margin: 0; }
   z-index: 1;
 }
 
-.projector-screen {
-  position: relative;
-  overflow: hidden;
-}
-
 /* Overlay controls row in control page */
 .overlay-controls-row {
   display: flex;
@@ -2392,8 +2416,31 @@ kbd {
 
 /* ─── Background Panel ─── */
 .bg-tabs {
-  display: flex;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.bg-tabs .button {
+  padding: 12px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 14px;
+  min-height: 44px;
+}
+
+.bg-tabs .button.primary {
+  background: linear-gradient(135deg, #4fc3f7, #22c55e);
+  color: #0f172a;
+}
+
+.bg-tabs .button.subtle {
+  background: rgba(255, 255, 255, 0.05);
+  color: #dbeafe;
+}
+
+.bg-tabs .button:hover:not(:disabled) {
+  transform: translateY(-1px);
 }
 
 .bg-image-preview {
@@ -2402,39 +2449,39 @@ kbd {
 
 .bg-animated-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
 }
 
 .bg-animated-swatch {
-  height: 48px;
-  border-radius: 8px;
+  min-height: 72px;
+  border-radius: 16px;
   border: 2px solid transparent;
   cursor: pointer;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding: 4px;
-  transition: border-color 0.15s, transform 0.15s;
+  padding: 10px;
+  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
   background-size: 400% 400%;
   animation: bg-animate 8s ease infinite;
 }
 
 .bg-animated-swatch span {
-  font-size: 9px;
-  font-weight: 600;
-  color: rgba(255,255,255,0.8);
-  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.92);
+  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
 }
 
 .bg-animated-swatch:hover {
-  transform: scale(1.03);
+  transform: translateY(-2px) scale(1.02);
   border-color: var(--accent);
 }
 
 .bg-animated-swatch.active {
-  border-color: var(--success);
-  box-shadow: 0 0 10px rgba(34, 197, 94, 0.3);
+  border-color: #22c55e;
+  box-shadow: 0 0 18px rgba(34, 197, 94, 0.35);
 }
 
 @keyframes bg-animate {

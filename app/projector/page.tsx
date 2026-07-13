@@ -242,7 +242,7 @@ export default function ProjectorPage() {
                 className="projector-line"
                 style={{
                   fontFamily: currentSlide.textStyle?.fontFamily,
-                  fontSize: currentSlide.textStyle?.fontSize ? `${currentSlide.textStyle.fontSize}px` : `${projectorFontSize}px`,
+                  fontSize: `${effectiveProjectorFontSize}px`,
                   color: currentSlide.textStyle?.color ?? "#fff",
                   textAlign: "center",
                   fontWeight: currentSlide.textStyle?.bold ? 700 : undefined,

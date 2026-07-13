@@ -63,21 +63,21 @@ export function BackgroundPanel({ background, onBackgroundChange, standby, onTog
     <section className="scene-panel">
       <div className="panel-header"><p>Standby &amp; Background</p></div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-        <button type="button" className={`button ${standby ? "danger" : "outline"}`} style={{ flex: 1 }} onClick={onToggleStandby}>
-          {standby ? "⏸ Standby ON" : "▶ Go Live View"}
+      <div className="standby-action-row">
+        <button type="button" className={`button ${standby ? "danger" : "primary"}`} onClick={onToggleStandby}>
+          {standby ? "⏸ Standby" : "▶ Go Live"}
         </button>
       </div>
 
       {/* Background type tabs */}
       <div className="bg-tabs">
-        <button type="button" className={`button ${tab === "color" ? "primary" : "subtle"}`} onClick={() => setTab("color")} style={{ flex: 1, padding: "6px 8px", fontSize: 11 }}>
+        <button type="button" className={`button ${tab === "color" ? "primary" : "subtle"}`} onClick={() => setTab("color")}>
           Solid Color
         </button>
-        <button type="button" className={`button ${tab === "image" ? "primary" : "subtle"}`} onClick={() => setTab("image")} style={{ flex: 1, padding: "6px 8px", fontSize: 11 }}>
+        <button type="button" className={`button ${tab === "image" ? "primary" : "subtle"}`} onClick={() => setTab("image")}>
           Image
         </button>
-        <button type="button" className={`button ${tab === "animated" ? "primary" : "subtle"}`} onClick={() => setTab("animated")} style={{ flex: 1, padding: "6px 8px", fontSize: 11 }}>
+        <button type="button" className={`button ${tab === "animated" ? "primary" : "subtle"}`} onClick={() => setTab("animated") }>
           Animated
         </button>
       </div>

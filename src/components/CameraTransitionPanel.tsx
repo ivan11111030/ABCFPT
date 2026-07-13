@@ -8,6 +8,12 @@ type CameraTransitionPanelProps = {
 const transitions: CameraTransition[] = ["cut", "fade", "cross-dissolve"];
 
 export function CameraTransitionPanel({ transition, onChangeTransition }: CameraTransitionPanelProps) {
+  const formatTransitionLabel = (mode: CameraTransition) =>
+    mode
+      .split("-")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+
   return (
     <section className="transition-panel">
       <div className="panel-header">
@@ -21,7 +27,7 @@ export function CameraTransitionPanel({ transition, onChangeTransition }: Camera
             className={transition === mode ? "button primary" : "button subtle"}
             onClick={() => onChangeTransition(mode)}
           >
-            {mode.replace("-", " ")}
+            {formatTransitionLabel(mode)}
           </button>
         ))}
       </div>
