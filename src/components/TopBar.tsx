@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 type TopBarProps = {
   title: string;
@@ -52,16 +53,29 @@ export function TopBar({ title, badge, currentSong, isLive, cameraCount, onlineC
   const minutes = String(Math.floor(elapsed / 60)).padStart(2, "0");
   const seconds = String(elapsed % 60).padStart(2, "0");
 
+  const pathname = usePathname();
+  const navItems = [
+    { href: "/control", label: "Control" },
+    { href: "/songs", label: "Songs" },
+    { href: "/teleprompter", label: "Teleprompter" },
+    { href: "/projector", label: "Projector" },
+  ];
+
   return (
     <header className="topbar">
       <div className="topbar-left">
         <span className="topbar-title">{title}</span>
         {isLive && <span className="status-pill live">🔴 LIVE</span>}
         <nav className="topbar-nav">
-          <Link href="/control" className="topbar-nav-link">Control</Link>
-          <Link href="/songs" className="topbar-nav-link">Songs</Link>
-          <Link href="/teleprompter" className="topbar-nav-link">Teleprompter</Link>
-          <Link href="/projector" className="topbar-nav-link">Projector</Link>
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`topbar-nav-link${pathname === item.href ? " active" : ""}`}
+            >
+              {item.label}
+            </Link>
+          ))}
         </nav>
       </div>
       <div className="topbar-info">
