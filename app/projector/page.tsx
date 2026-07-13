@@ -169,6 +169,8 @@ export default function ProjectorPage() {
   const slideTransition = currentSlide?.transition;
   const transitionClass = slideTransition ? `slide-transition-${slideTransition.type}` : "slide-transition-fade";
 
+  const effectiveProjectorFontSize = Math.max(projectorFontSize, currentSlide?.textStyle?.fontSize ?? 0, 42);
+
   // Track slide changes for transition animation
   useEffect(() => {
     setPrevSlideIndex(slideIndex);
