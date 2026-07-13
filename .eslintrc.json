@@ -1,0 +1,10 @@
+{
+  "extends": ["next/core-web-vitals"],
+  "rules": {
+    "react-hooks/exhaustive-deps": "warn",
+    "eqeqeq": ["warn", "smart"],
+    "no-console": "off",
+    "prefer-const": "warn"
+  },
+  "ignorePatterns": ["server/**", "*.test.ts", "*.test.tsx"]
+}

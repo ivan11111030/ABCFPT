@@ -80,6 +80,7 @@ out
 
 # Cloud song data (server-side persistent storage)
 server/cloud_songs.json
+server/state_snapshot.json
 
 # Nuxt.js build / generate output
 .nuxt
