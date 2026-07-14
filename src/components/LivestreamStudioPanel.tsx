@@ -100,11 +100,11 @@ export function LivestreamStudioPanel({
             disabled={!streamKey.trim()}
             style={{ flex: 1 }}
           >
-            🔴 Start Stream
+            🔴 GO LIVE
           </button>
         ) : (
           <button type="button" className="button danger" onClick={onStop} style={{ flex: 1 }}>
-            ⏹ Stop Stream
+            ⏹ STOP
           </button>
         )}
       </div>

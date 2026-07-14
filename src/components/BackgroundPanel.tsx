@@ -65,7 +65,7 @@ export function BackgroundPanel({ background, onBackgroundChange, standby, onTog
 
       <div className="standby-action-row">
         <button type="button" className={`button ${standby ? "danger" : "primary"}`} onClick={onToggleStandby}>
-          {standby ? "⏸ Standby" : "▶ Go Live"}
+          {standby ? "⏸ STANDBY" : "▶ GO LIVE"}
         </button>
       </div>
 
