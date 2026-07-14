@@ -24,7 +24,10 @@ export default function TeleprompterPage() {
     setSongs(loadedSongs);
     setCurrentSongId((current) => current || (loadedSongs[0]?.id ?? ""));
 
-    socket.on("connect", () => setConnected(true));
+    socket.on("connect", () => {
+      setConnected(true);
+      socket.emit("display:requestSync");
+    });
     socket.on("disconnect", () => setConnected(false));
 
     // Full state sync from server on connect
@@ -35,6 +38,10 @@ export default function TeleprompterPage() {
       if (serverState.currentSlide !== undefined) setSlideIndex(serverState.currentSlide);
       if (serverState.teleprompterFontSize !== undefined) setFontSize(serverState.teleprompterFontSize);
     });
+
+    if (socket.connected) {
+      socket.emit("display:requestSync");
+    }
 
     socket.on("display:teleprompterFontSize", (size: number) => {
       setFontSize(size);

@@ -42,7 +42,10 @@ export default function ProjectorPage() {
   const song = songs.find((s) => s.id === currentSongId) ?? songs[0];
 
   useEffect(() => {
-    socket.on("connect", () => setConnected(true));
+    socket.on("connect", () => {
+      setConnected(true);
+      socket.emit("display:requestSync");
+    });
     socket.on("disconnect", () => setConnected(false));
 
     // Full state sync from server on connect
@@ -53,11 +56,20 @@ export default function ProjectorPage() {
       if (serverState.currentSlide !== undefined) setSlideIndex(serverState.currentSlide);
       if (serverState.overlayEnabled !== undefined) setOverlayEnabled(serverState.overlayEnabled);
       if (serverState.overlayPosition) setOverlayPos(serverState.overlayPosition);
+      if (serverState.overlayOpacity !== undefined) setOverlayOpacity(serverState.overlayOpacity);
+      if (serverState.overlayHeight !== undefined) setOverlayHeight(serverState.overlayHeight);
+      if (serverState.canvaOverlayImage !== undefined) setCanvaOverlayImage(serverState.canvaOverlayImage);
       if (serverState.standby !== undefined) setStandby(serverState.standby);
       if (serverState.background) setBackground(serverState.background);
       if (serverState.currentScene) setActiveScene(serverState.currentScene);
+      if (serverState.sceneType) setActiveSceneType(serverState.sceneType);
+      if (serverState.sceneConfig) setSceneConfig(serverState.sceneConfig);
       if (serverState.projectorFontSize !== undefined) setProjectorFontSize(serverState.projectorFontSize);
     });
+
+    if (socket.connected) {
+      socket.emit("display:requestSync");
+    }
 
     socket.on("display:projectorFontSize", (size: number) => {
       setProjectorFontSize(size);
