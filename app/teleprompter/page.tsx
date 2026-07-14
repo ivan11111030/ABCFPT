@@ -98,7 +98,7 @@ export default function TeleprompterPage() {
 
       <section className="teleprompter-stage" style={{ fontSize }}>
         <div>
-          <p className="teleprompter-current">{currentSlide?.text}</p>
+          <p className="teleprompter-current" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{currentSlide?.text}</p>
           {nextLine && (
             <p className="teleprompter-next">
               Next: {nextLine}

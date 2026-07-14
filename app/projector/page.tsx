@@ -19,7 +19,7 @@ export default function ProjectorPage() {
   const [overlayPos, setOverlayPos] = useState<OverlayPosition>(LAYOUT_PRESETS["lower-third"]);
   const [overlayOpacity, setOverlayOpacity] = useState(100);
   const [overlayHeight, setOverlayHeight] = useState(25);
-  const [projectorFontSize, setProjectorFontSize] = useState(42);
+  const [projectorFontSize, setProjectorFontSize] = useState(56);
   const [hasVideoStream, setHasVideoStream] = useState(false);
   const [connected, setConnected] = useState(false);
   const [standby, setStandby] = useState(false);
@@ -181,7 +181,7 @@ export default function ProjectorPage() {
   const slideTransition = currentSlide?.transition;
   const transitionClass = slideTransition ? `slide-transition-${slideTransition.type}` : "slide-transition-fade";
 
-  const effectiveProjectorFontSize = Math.max(projectorFontSize, currentSlide?.textStyle?.fontSize ?? 0, 42);
+  const effectiveProjectorFontSize = Math.max(projectorFontSize, currentSlide?.textStyle?.fontSize ?? 0, 56);
 
   // Track slide changes for transition animation
   useEffect(() => {
@@ -259,6 +259,8 @@ export default function ProjectorPage() {
                   textAlign: "center",
                   fontWeight: currentSlide.textStyle?.bold ? 700 : undefined,
                   fontStyle: currentSlide.textStyle?.italic ? "italic" : undefined,
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
                 }}
               >
                 {currentSlide.text}
@@ -307,7 +309,7 @@ export default function ProjectorPage() {
             {currentSlide.renderedImage ? (
               <img src={currentSlide.renderedImage} alt={currentSlide.section} style={{ maxWidth: "100%", borderRadius: 8 }} />
             ) : (
-              <p>{currentSlide.text}</p>
+              <p style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", margin: 0 }}>{currentSlide.text}</p>
             )}
             <span className="overlay-section">{currentSlide.section} • {song?.title}</span>
           </div>
