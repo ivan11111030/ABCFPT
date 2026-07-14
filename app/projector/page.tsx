@@ -19,7 +19,7 @@ export default function ProjectorPage() {
   const [overlayPos, setOverlayPos] = useState<OverlayPosition>(LAYOUT_PRESETS["lower-third"]);
   const [overlayOpacity, setOverlayOpacity] = useState(100);
   const [overlayHeight, setOverlayHeight] = useState(25);
-  const [projectorFontSize, setProjectorFontSize] = useState(42);
+  const [projectorFontSize, setProjectorFontSize] = useState(96);
   const [hasVideoStream, setHasVideoStream] = useState(false);
   const [connected, setConnected] = useState(false);
   const [standby, setStandby] = useState(false);
