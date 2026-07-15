@@ -1621,25 +1621,23 @@ h1, h2, h3, p { margin: 0; }
 .projector-screen {
   display: grid;
   place-items: center;
-  gap: var(--sp-3);
   text-align: center;
   padding: 0;
   width: 100%;
   min-height: 100vh;
   position: relative;
+  overflow: hidden;
   z-index: 1;
   background: transparent;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
-  max-width: none;
+}
+
+.projector-content {
   display: grid;
   place-items: center;
   gap: var(--sp-3);
   text-align: center;
   padding: clamp(20px, 4vw, 40px);
   width: min(96vw, 1080px);
-  min-height: 100vh;
   position: relative;
   z-index: 1;
   background: rgba(0, 0, 0, 0.15);
@@ -1660,6 +1658,14 @@ h1, h2, h3, p { margin: 0; }
   padding: 0 24px;
   margin: 0 auto;
   word-break: break-word;
+  /* Safety net so a per-slide text color (see SongManagementPanel's text
+   * color picker) that's too close to the background — including black —
+   * still reads as a visible outlined shape instead of vanishing entirely. */
+  text-shadow:
+    0 0 2px rgba(255, 255, 255, 0.9),
+    0 0 6px rgba(255, 255, 255, 0.5),
+    1px 1px 3px rgba(0, 0, 0, 0.6),
+    -1px -1px 3px rgba(0, 0, 0, 0.6);
 }
 
 .projector-section {
