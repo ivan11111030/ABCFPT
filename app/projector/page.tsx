@@ -43,8 +43,15 @@ export default function ProjectorPage() {
   const song = songs.find((s) => s.id === currentSongId) ?? songs[0];
 
   useEffect(() => {
-    socket.on("connect", () => setConnected(true));
+    socket.on("connect", () => {
+      setConnected(true);
+      socket.emit("display:requestSync");
+    });
     socket.on("disconnect", () => setConnected(false));
+
+    if (socket.connected) {
+      socket.emit("display:requestSync");
+    }
 
     // Full state sync from server on connect
     socket.on("state:sync", (serverState: ServerStateSync) => {
