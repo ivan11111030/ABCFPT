@@ -7,6 +7,7 @@ import * as songStore from "@/src/lib/songStore";
 import { DraggableOverlay, LAYOUT_PRESETS, type OverlayPosition } from "@/src/components/DraggableOverlay";
 import type { Song, BackgroundConfig } from "@/src/types/production";
 import type { SceneConfig, SceneType } from "@/src/types/scene";
+import type { ServerStateSync, ControlScenePayload } from "@/src/types/socketEvents";
 import { DEFAULT_SCENE_CONFIGS } from "@/src/types/scene";
 
 const socket = createSocketClient();
@@ -46,7 +47,7 @@ export default function ProjectorPage() {
     socket.on("disconnect", () => setConnected(false));
 
     // Full state sync from server on connect
-    socket.on("state:sync", (serverState: any) => {
+    socket.on("state:sync", (serverState: ServerStateSync) => {
       setConnected(true);
       if (serverState.songs?.length) songStore.mergeFromServer(serverState.songs);
       if (serverState.currentSongId) setCurrentSongId(serverState.currentSongId);
@@ -70,7 +71,7 @@ export default function ProjectorPage() {
       setSlideIndex(0);
     });
     socket.on("song:list", (songList: Song[]) => songStore.setSongs(songList));
-    socket.on("control:scene", (payload: any) => {
+    socket.on("control:scene", (payload: ControlScenePayload) => {
       const scene = typeof payload === "string" ? payload : payload.scene;
       if (scene) setActiveScene(scene);
       if (payload?.sceneType) setActiveSceneType(payload.sceneType);
@@ -211,6 +212,33 @@ export default function ProjectorPage() {
       )}
 
       {/* Connection status + back nav (hover to show) */}
+      {/* TEMPORARY DEBUG READOUT — remove once the blank-projector issue is diagnosed */}
+      <div
+        style={{
+          position: "fixed", bottom: 8, left: 8, zIndex: 999,
+          background: "rgba(0,0,0,0.85)", color: "#0f0", fontFamily: "monospace",
+          fontSize: 11, padding: "8px 10px", borderRadius: 6, maxWidth: "90vw",
+          whiteSpace: "pre-wrap", wordBreak: "break-word", border: "1px solid #0f0",
+        }}
+      >
+        {JSON.stringify(
+          {
+            standby,
+            hasVideoStream,
+            slideIndex,
+            songTitle: song?.title ?? null,
+            songSlideCount: song?.slides?.length ?? null,
+            currentSlideExists: !!currentSlide,
+            currentSlideText: currentSlide?.text ?? null,
+            currentSlideSection: currentSlide?.section ?? null,
+            currentSlideRenderedImage: !!currentSlide?.renderedImage,
+            currentSlideTextStyle: currentSlide?.textStyle ?? null,
+          },
+          null,
+          2
+        )}
+      </div>
+
       <div
         style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 30, padding: "8px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", opacity: showNav ? 1 : 0, transition: "opacity 0.3s", background: "rgba(0,0,0,0.7)" }}
         onMouseEnter={() => setShowNav(true)}
