@@ -12,6 +12,15 @@ type LivestreamStudioPanelProps = {
   onToggleOverlay: () => void;
   onChangeRtmpUrl: (url: string) => void;
   onChangeStreamKey: (key: string) => void;
+  encodingProfile: "low" | "medium" | "high" | "ultra";
+  onChangeEncodingProfile: (profile: "low" | "medium" | "high" | "ultra") => void;
+};
+
+const ENCODING_PROFILE_LABELS: Record<"low" | "medium" | "high" | "ultra", string> = {
+  low: "Low — 1 Mbps, 24fps (weak connections)",
+  medium: "Medium — 2.5 Mbps, 30fps (recommended default)",
+  high: "High — 4.5 Mbps, 30fps (strong upload)",
+  ultra: "Ultra — 8 Mbps, 60fps (very strong upload)",
 };
 
 export function LivestreamStudioPanel({
@@ -25,6 +34,8 @@ export function LivestreamStudioPanel({
   onToggleOverlay,
   onChangeRtmpUrl,
   onChangeStreamKey,
+  encodingProfile,
+  onChangeEncodingProfile,
 }: LivestreamStudioPanelProps) {
   const [rtmpUrl, setRtmpUrl] = useState("rtmps://live-api-s.facebook.com:443/rtmp/");
   const [streamKey, setStreamKey] = useState("");
@@ -77,6 +88,20 @@ export function LivestreamStudioPanel({
               onChangeStreamKey(event.target.value);
             }}
           />
+        </label>
+        <label htmlFor="encoding-profile">
+          Stream Quality
+          <select
+            id="encoding-profile"
+            name="encoding-profile"
+            value={encodingProfile}
+            disabled={isLive}
+            onChange={(event) => onChangeEncodingProfile(event.target.value as "low" | "medium" | "high" | "ultra")}
+          >
+            {(Object.keys(ENCODING_PROFILE_LABELS) as Array<keyof typeof ENCODING_PROFILE_LABELS>).map((key) => (
+              <option key={key} value={key}>{ENCODING_PROFILE_LABELS[key]}</option>
+            ))}
+          </select>
         </label>
       </div>
       {streamStatus && (

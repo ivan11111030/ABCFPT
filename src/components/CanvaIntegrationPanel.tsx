@@ -62,7 +62,7 @@ export function CanvaIntegrationPanel({ onApplyAsOverlay, onApplyAsBackground }:
       }
 
       const data = await res.json();
-      const items: CanvaDesign[] = (data.items || []).map((item: any) => ({
+      const items: CanvaDesign[] = (data.items || []).map((item: { id: string; title?: string; thumbnail?: { url?: string } }) => ({
         id: item.id,
         title: item.title || "Untitled Design",
         thumbnailUrl: item.thumbnail?.url || "",
