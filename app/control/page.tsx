@@ -61,6 +61,7 @@ export default function ControlPage() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [rtmpUrl, setRtmpUrl] = useState("rtmps://live-api-s.facebook.com:443/rtmp/");
   const [streamKey, setStreamKey] = useState("");
+  const [encodingProfile, setEncodingProfile] = useState<"low" | "medium" | "high" | "ultra">("medium");
   const [isLive, setIsLive] = useState(false);
   const [standby, setStandby] = useState(false);
   const [background, setBackground] = useState<BackgroundConfig>({ type: "color", value: "#000000", opacity: 100 });
@@ -962,6 +963,8 @@ export default function ControlPage() {
             onToggleOverlay={toggleOverlay}
             onChangeRtmpUrl={setRtmpUrl}
             onChangeStreamKey={setStreamKey}
+            encodingProfile={encodingProfile}
+            onChangeEncodingProfile={setEncodingProfile}
           />
           {/* Standby & Background */}
           <BackgroundPanel
