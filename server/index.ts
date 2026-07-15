@@ -4,6 +4,16 @@ import fs from "fs";
 import path from "path";
 import { spawn, type ChildProcess } from "child_process";
 import { Server, type Socket } from "socket.io";
+import ffmpegStatic from "ffmpeg-static";
+import { isAuthEnforced, authInitError, verifyIdToken } from "./auth";
+
+// ffmpeg-static downloads a prebuilt ffmpeg binary into node_modules during
+// `npm install` — no system package manager / root access required. This is
+// necessary on hosts like Render whose build filesystem doesn't allow
+// `apt-get install ffmpeg`. Falls back to the "ffmpeg" on PATH (e.g. for
+// local dev where it's installed via Homebrew/apt) if the static binary
+// couldn't be resolved for some reason.
+const FFMPEG_PATH = ffmpegStatic || "ffmpeg";
 
 const app = express();
 const port = Number(process.env.PORT) || 4000;
@@ -32,12 +42,49 @@ type Camera = {
   enabled?: boolean; isMobile?: boolean; signalStrength?: string; presetList?: string[];
 };
 
+/* ── Lightweight payload validation ─────────────────────
+ * Not a full schema validator (no new dependency for this) — just enough to
+ * reject obviously-malformed payloads before they get persisted to disk or
+ * broadcast to every connected client, instead of trusting client input
+ * shapes implicitly. */
+function isValidSong(value: unknown): value is Song {
+  if (!value || typeof value !== "object") return false;
+  const s = value as Record<string, unknown>;
+  return (
+    typeof s.id === "string" && s.id.length > 0 &&
+    typeof s.title === "string" &&
+    typeof s.artist === "string" &&
+    typeof s.key === "string" &&
+    typeof s.tempo === "number" &&
+    typeof s.currentSection === "string" &&
+    typeof s.favorite === "boolean" &&
+    Array.isArray(s.slides)
+  );
+}
+
+function isValidCamera(value: unknown): value is Camera {
+  if (!value || typeof value !== "object") return false;
+  const c = value as Record<string, unknown>;
+  return (
+    typeof c.id === "string" && c.id.length > 0 &&
+    typeof c.name === "string" &&
+    typeof c.protocol === "string" &&
+    typeof c.streamUrl === "string" &&
+    typeof c.status === "string" &&
+    typeof c.supportsPTZ === "boolean"
+  );
+}
+
+const CAMERA_TRANSITIONS = new Set(["cut", "fade", "cross-dissolve"]);
+const BACKGROUND_TYPES = new Set(["color", "image"]);
+
 /* ── Shared in-memory state ─────────────────────────── */
 
 /* ── Persistent song file on disk ───────────────────── */
 const __filename = new URL(import.meta.url).pathname;
 const __dirname = path.dirname(__filename);
 const CLOUD_SONGS_PATH = path.join(__dirname, "cloud_songs.json");
+const STATE_SNAPSHOT_PATH = path.join(__dirname, "state_snapshot.json");
 
 type CloudData = {
   songs: Song[];
@@ -88,9 +135,73 @@ const state = {
   sceneConfig: null as any,
 };
 
+/**
+ * Fields worth surviving a server restart (Render redeploys, free-tier
+ * spin-down/up, crashes). Deliberately excludes:
+ *  - `songs` — persisted separately via cloud_songs.json
+ *  - `isLive` — should never come back "live" automatically after a
+ *    restart; the ffmpeg process is gone regardless, so this would just be
+ *    a UI lie until someone notices and manually restarts the stream.
+ *
+ * Note: on hosts without a persistent disk (e.g. Render's free plan without
+ * a paid Disk attached), this file itself won't survive a redeploy either —
+ * it still helps with in-process restarts/crashes, and with any host that
+ * does keep local disk between runs.
+ */
+const PERSISTED_STATE_KEYS = [
+  "currentSongId", "currentSlide", "currentScene", "cameras", "activeCameraId",
+  "cameraTransition", "overlayEnabled", "overlayPosition", "teleprompterFontSize",
+  "projectorFontSize", "standby", "background", "sceneType", "sceneConfig",
+] as const satisfies readonly (keyof typeof state)[];
+
+function loadStateSnapshot(): void {
+  try {
+    if (!fs.existsSync(STATE_SNAPSHOT_PATH)) return;
+    const raw = fs.readFileSync(STATE_SNAPSHOT_PATH, "utf-8");
+    const parsed = JSON.parse(raw) as Partial<typeof state>;
+    for (const key of PERSISTED_STATE_KEYS) {
+      if (parsed[key] !== undefined) {
+        (state as any)[key] = parsed[key];
+      }
+    }
+    console.log("[State] Restored snapshot from previous run.");
+  } catch (err) {
+    console.error("[State] Failed to load state_snapshot.json:", err);
+  }
+}
+
+let stateSaveTimer: ReturnType<typeof setTimeout> | null = null;
+function persistState(): void {
+  // Debounced so rapid-fire updates (e.g. dragging an overlay slider) don't
+  // hammer the disk with a write per event.
+  if (stateSaveTimer) clearTimeout(stateSaveTimer);
+  stateSaveTimer = setTimeout(() => {
+    try {
+      const snapshot: Record<string, unknown> = {};
+      for (const key of PERSISTED_STATE_KEYS) snapshot[key] = state[key];
+      fs.writeFileSync(STATE_SNAPSHOT_PATH, JSON.stringify(snapshot, null, 2), "utf-8");
+    } catch (err) {
+      console.error("[State] Failed to write state_snapshot.json:", err);
+    }
+  }, 1000);
+}
+
+loadStateSnapshot();
+
 /* ── FFmpeg RTMP streaming ──────────────────────────── */
 let ffmpegProcess: ChildProcess | null = null;
 let streamTargetUrl: string = "";
+
+type EncodingProfileName = "low" | "medium" | "high" | "ultra";
+const ENCODING_PROFILES: Record<EncodingProfileName, { videoBitrate: string; bufsize: string; audioBitrate: string; fps: string }> = {
+  low: { videoBitrate: "1000k", bufsize: "2000k", audioBitrate: "96k", fps: "24" },
+  medium: { videoBitrate: "2500k", bufsize: "5000k", audioBitrate: "128k", fps: "30" },
+  high: { videoBitrate: "4500k", bufsize: "9000k", audioBitrate: "160k", fps: "30" },
+  ultra: { videoBitrate: "8000k", bufsize: "16000k", audioBitrate: "192k", fps: "60" },
+};
+const DEFAULT_ENCODING_PROFILE: EncodingProfileName = (process.env.DEFAULT_ENCODING_PROFILE as EncodingProfileName) in ENCODING_PROFILES
+  ? (process.env.DEFAULT_ENCODING_PROFILE as EncodingProfileName)
+  : "medium";
 
 function stopFfmpeg() {
   if (ffmpegProcess) {
@@ -103,8 +214,10 @@ function stopFfmpeg() {
   streamTargetUrl = "";
 }
 
-function startFfmpeg(rtmpUrl: string, streamKey: string): { ok: boolean; error?: string } {
+function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingProfileName = DEFAULT_ENCODING_PROFILE): { ok: boolean; error?: string } {
   stopFfmpeg(); // clean up previous
+
+  const profile = ENCODING_PROFILES[profileName] ?? ENCODING_PROFILES[DEFAULT_ENCODING_PROFILE];
 
   const normalizedRtmpUrl = rtmpUrl.trim();
   const normalizedStreamKey = streamKey.trim().replace(/^\/+/, "");
@@ -125,15 +238,15 @@ function startFfmpeg(rtmpUrl: string, streamKey: string): { ok: boolean; error?:
       "-c:v", "libx264",
       "-preset", "veryfast",
       "-tune", "zerolatency",
-      "-b:v", "2500k",
-      "-maxrate", "2500k",
-      "-bufsize", "5000k",
+      "-b:v", profile.videoBitrate,
+      "-maxrate", profile.videoBitrate,
+      "-bufsize", profile.bufsize,
       "-pix_fmt", "yuv420p",
-      "-g", "60",             // keyframe every 2s at 30fps
-      "-r", "30",
+      "-g", String(Number(profile.fps) * 2), // keyframe every 2s
+      "-r", profile.fps,
       // Audio encoding
       "-c:a", "aac",
-      "-b:a", "128k",
+      "-b:a", profile.audioBitrate,
       "-ar", "44100",
       // Output
       "-f", "flv",
@@ -141,7 +254,7 @@ function startFfmpeg(rtmpUrl: string, streamKey: string): { ok: boolean; error?:
       fullUrl,
     ];
 
-    ffmpegProcess = spawn("ffmpeg", args, { stdio: ["pipe", "pipe", "pipe"] });
+    ffmpegProcess = spawn(FFMPEG_PATH, args, { stdio: ["pipe", "pipe", "pipe"] });
 
     ffmpegProcess.stderr?.on("data", (data: Buffer) => {
       const msg = data.toString();
@@ -191,6 +304,31 @@ const io = new Server(server, {
   transports: ["websocket", "polling"], // Support both transports
   maxHttpBufferSize: 5e6, // 5MB for video chunks
   allowUpgrades: true, // Allow transport upgrade from polling to websocket
+});
+
+/**
+ * Verify the operator's Firebase ID token (sent by the control page as
+ * `socket.auth.token`) on every connection attempt, and mark the socket
+ * accordingly. Individual "privileged" event handlers below check
+ * `socket.data.authenticated` and reject the action if it's false.
+ *
+ * Cameras, the projector, and the teleprompter connect without a token by
+ * design (they're not signed in) — only the small set of operator-only
+ * events (control:*, song:*, stream:start/stop, etc.) are gated.
+ */
+io.use(async (socket, next) => {
+  if (!isAuthEnforced()) {
+    // FIREBASE_SERVICE_ACCOUNT_KEY isn't configured — fall back to the
+    // previous (unauthenticated) behavior rather than locking everyone out.
+    socket.data.authenticated = true;
+    return next();
+  }
+
+  const token = (socket.handshake.auth as { token?: string } | undefined)?.token;
+  const uid = await verifyIdToken(token);
+  socket.data.authenticated = uid !== null;
+  socket.data.uid = uid;
+  next();
 });
 
 app.use((req: Request, res: Response, next) => {
@@ -293,55 +431,83 @@ app.get("/api/songs/download", (req: Request, res: Response) => {
 io.on("connection", (socket: Socket) => {
   console.log(`Socket connected: ${socket.id}`);
 
+  // Call at the top of an operator-only handler; returns false (and notifies
+  // the client) if this socket didn't pass Firebase ID token verification.
+  // NOT used for camera join / display sync events, which unauthenticated
+  // phones and displays legitimately need to be able to send.
+  const authGuard = (): boolean => {
+    if (!socket.data.authenticated) {
+      socket.emit("auth:required", { message: "Sign in required to control the stream." });
+      return false;
+    }
+    return true;
+  };
+
   // Push full current state to newly connected client
   socket.emit("state:sync", state);
 
   /* ── Control events (io.emit so ALL clients sync) ── */
   socket.on("control:slide", (slideIndex: number) => {
+    if (!authGuard()) return;
     state.currentSlide = slideIndex;
+    persistState();
     io.emit("control:slide", slideIndex);
   });
 
   socket.on("control:song", (songId: string) => {
+    if (!authGuard()) return;
     state.currentSongId = songId;
     state.currentSlide = 0;
+    persistState();
     io.emit("control:song", songId);
     io.emit("control:slide", 0);
   });
 
   socket.on("control:scene", (payload: { scene: string; cameraId: string; transition: string; sceneType?: string; sceneConfig?: any } | string) => {
+    if (!authGuard()) return;
     const scene = (typeof payload === "string" ? payload : payload.scene) as SceneMode;
     state.currentScene = scene;
     if (typeof payload !== "string") {
       if (payload.sceneType) state.sceneType = payload.sceneType;
       if (payload.sceneConfig) state.sceneConfig = payload.sceneConfig;
     }
+    persistState();
     io.emit("control:scene", typeof payload === "string" ? { scene } : payload);
   });
 
   socket.on("control:camera", (cameraId: string) => {
+    if (!authGuard()) return;
     state.activeCameraId = cameraId;
+    persistState();
     io.emit("control:camera", cameraId);
   });
 
   socket.on("control:camera:transition", (transition: string) => {
+    if (!authGuard()) return;
+    if (!CAMERA_TRANSITIONS.has(transition)) return;
     state.cameraTransition = transition as CameraTransition;
+    persistState();
     io.emit("control:camera:transition", transition);
   });
 
   /* ── Song CRUD ───────────────────────────────────── */
   socket.on("song:add", (song: Song) => {
+    if (!authGuard()) return;
+    if (!isValidSong(song)) return;
     state.songs.push(song);
     io.emit("song:list", state.songs);
   });
 
   socket.on("song:update", (song: Song) => {
+    if (!authGuard()) return;
+    if (!isValidSong(song)) return;
     const idx = state.songs.findIndex((s) => s.id === song.id);
     if (idx >= 0) state.songs[idx] = song;
     io.emit("song:list", state.songs);
   });
 
   socket.on("song:delete", (songId: string) => {
+    if (!authGuard()) return;
     state.songs = state.songs.filter((s) => s.id !== songId);
     if (state.currentSongId === songId && state.songs.length > 0) {
       state.currentSongId = state.songs[0].id;
@@ -353,7 +519,10 @@ io.on("connection", (socket: Socket) => {
   });
 
   socket.on("song:import", (songs: Song[]) => {
+    if (!authGuard()) return;
+    if (!Array.isArray(songs)) return;
     for (const song of songs) {
+      if (!isValidSong(song)) continue;
       if (!state.songs.some((s) => s.id === song.id)) {
         state.songs.push(song);
       }
@@ -362,6 +531,8 @@ io.on("connection", (socket: Socket) => {
   });
 
   socket.on("song:reorder", (songIds: string[]) => {
+    if (!authGuard()) return;
+    if (!Array.isArray(songIds) || !songIds.every((id) => typeof id === "string")) return;
     const reordered: Song[] = [];
     for (const id of songIds) {
       const song = state.songs.find((s) => s.id === id);
@@ -376,6 +547,7 @@ io.on("connection", (socket: Socket) => {
 
   /* ── Camera events ───────────────────────────────── */
   socket.on("camera:add", (camera: Camera) => {
+    if (!isValidCamera(camera)) return;
     if (camera.isMobile) {
       socketCameraMap.set(socket.id, camera.id);
     }
@@ -386,6 +558,7 @@ io.on("connection", (socket: Socket) => {
       const idx = state.cameras.findIndex((c) => c.id === camera.id);
       if (idx >= 0) state.cameras[idx] = { ...state.cameras[idx], ...camera, status: "online" };
     }
+    persistState();
     io.emit("camera:list", state.cameras);
   });
 
@@ -394,6 +567,7 @@ io.on("connection", (socket: Socket) => {
     if (socketCameraMap.get(socket.id) === cameraId) {
       socketCameraMap.delete(socket.id);
     }
+    persistState();
     io.emit("camera:list", state.cameras);
   });
 
@@ -419,6 +593,7 @@ io.on("connection", (socket: Socket) => {
       const idx = state.cameras.findIndex((c) => c.id === cam.id);
       if (idx >= 0) state.cameras[idx] = { ...state.cameras[idx], status: "online" };
     }
+    persistState();
     io.emit("camera:list", state.cameras);
     socket.broadcast.emit("mobile-camera:joined", data);
   });
@@ -435,6 +610,25 @@ io.on("connection", (socket: Socket) => {
     socket.broadcast.emit("mobile-camera:candidate", payload);
   });
 
+  /* ── Projector WebRTC signaling (control → projector video background) ──
+   * Relay only — no client currently emits "projector:offer" (the control
+   * page doesn't yet send its active camera feed to the projector this
+   * way), so this is currently inert. The projector page already has a
+   * working receiver for it. Gated behind auth since, if used, it would be
+   * operator-initiated. */
+  socket.on("projector:offer", (payload: Record<string, unknown>) => {
+    if (!authGuard()) return;
+    socket.broadcast.emit("projector:offer", payload);
+  });
+
+  socket.on("projector:answer", (payload: Record<string, unknown>) => {
+    socket.broadcast.emit("projector:answer", payload);
+  });
+
+  socket.on("projector:candidate", (payload: Record<string, unknown>) => {
+    socket.broadcast.emit("projector:candidate", payload);
+  });
+
   socket.on("mobile-camera:status", (status: Record<string, unknown>) => {
     socket.broadcast.emit("mobile-camera:status", status);
   });
@@ -448,11 +642,16 @@ io.on("connection", (socket: Socket) => {
   socket.on(
     "stream:start",
     (
-      payload: { rtmpUrl?: string; streamKey?: string; scene?: string; cameraId?: string },
+      payload: { rtmpUrl?: string; streamKey?: string; scene?: string; cameraId?: string; profile?: EncodingProfileName },
       callback: (result: { ok: boolean; message?: string; status?: string }) => void
     ) => {
+      if (!authGuard()) {
+        callback({ ok: false, message: "Sign in required to control the stream." });
+        return;
+      }
       const rtmpUrl = payload.rtmpUrl?.trim() || "";
       const streamKey = payload.streamKey?.trim().replace(/^\/+/, "") || "";
+      const profile: EncodingProfileName = payload.profile && payload.profile in ENCODING_PROFILES ? payload.profile : DEFAULT_ENCODING_PROFILE;
 
       if (!rtmpUrl || !streamKey) {
         const message = "RTMP URL and Stream Key are required.";
@@ -461,8 +660,8 @@ io.on("connection", (socket: Socket) => {
         return;
       }
 
-      console.log("[Stream] stream:start request received", { rtmpUrl, cameraId: payload.cameraId });
-      const result = startFfmpeg(rtmpUrl, streamKey);
+      console.log("[Stream] stream:start request received", { rtmpUrl, cameraId: payload.cameraId, profile });
+      const result = startFfmpeg(rtmpUrl, streamKey, profile);
       if (!result.ok) {
         const message = result.error || "Failed to start stream";
         socket.emit("stream:error", { message });
@@ -479,6 +678,7 @@ io.on("connection", (socket: Socket) => {
 
   // Binary video data from client MediaRecorder
   socket.on("stream:data", (chunk: Buffer | ArrayBuffer) => {
+    if (!authGuard()) return;
     if (!ffmpegProcess || !ffmpegProcess.stdin?.writable) {
       console.warn("[Stream] Dropping stream data: ffmpeg not ready");
       return;
@@ -492,6 +692,7 @@ io.on("connection", (socket: Socket) => {
   });
 
   socket.on("stream:stop", () => {
+    if (!authGuard()) return;
     stopFfmpeg();
     state.isLive = false;
     console.log("[Stream] Stream stopped");
@@ -499,56 +700,74 @@ io.on("connection", (socket: Socket) => {
   });
 
   socket.on("stream:toggleOverlay", (payload: { enabled: boolean }) => {
+    if (!authGuard()) return;
     state.overlayEnabled = payload.enabled;
+    persistState();
     io.emit("stream:overlayToggled", payload);
   });
 
   socket.on("stream:overlayPosition", (pos: OverlayPosition) => {
+    if (!authGuard()) return;
     state.overlayPosition = pos;
+    persistState();
     io.emit("stream:overlayPosition", pos);
   });
   socket.on("display:teleprompterFontSize", (size: number) => {
+    if (!authGuard()) return;
     state.teleprompterFontSize = size;
+    persistState();
     io.emit("display:teleprompterFontSize", size);
   });
 
   socket.on("display:projectorFontSize", (size: number) => {
+    if (!authGuard()) return;
     state.projectorFontSize = size;
+    persistState();
     io.emit("display:projectorFontSize", size);
   });
   socket.on("stream:overlayOpacity", (opacity: number) => {
+    if (!authGuard()) return;
     (state as any).overlayOpacity = opacity;
     io.emit("stream:overlayOpacity", opacity);
   });
 
   socket.on("stream:overlayHeight", (height: number) => {
+    if (!authGuard()) return;
     (state as any).overlayHeight = height;
     io.emit("stream:overlayHeight", height);
   });
 
   socket.on("stream:canvaOverlay", (imageUrl: string | null) => {
+    if (!authGuard()) return;
     (state as any).canvaOverlayImage = imageUrl;
     io.emit("stream:canvaOverlay", imageUrl);
   });
 
   /* ── Standby & Background ────────────────────────── */
   socket.on("control:standby", (enabled: boolean) => {
+    if (!authGuard()) return;
     state.standby = enabled;
+    persistState();
     io.emit("control:standby", enabled);
   });
 
   socket.on("control:background", (bg: { type: string; value: string }) => {
+    if (!authGuard()) return;
+    if (!bg || !BACKGROUND_TYPES.has(bg.type) || typeof bg.value !== "string") return;
     state.background = bg as typeof state.background;
+    persistState();
     io.emit("control:background", bg);
   });
 
   /* ── Discovery ───────────────────────────────────── */
   socket.on("camera:discover", (payload: Record<string, unknown>) => {
+    if (!authGuard()) return;
     socket.broadcast.emit("camera:discover", payload);
   });
 
   /* ── Audio ───────────────────────────────────────── */
   socket.on("audio:status", (audioStatus: Record<string, unknown>) => {
+    if (!authGuard()) return;
     io.emit("audio:status", audioStatus);
   });
 
@@ -557,8 +776,11 @@ io.on("connection", (socket: Socket) => {
     socket.emit("state:sync", state);
   });
 
+  /* ── Display resync request (projector/teleprompter reconnect, or the
+   * control page's "Reconnect Displays"/"Sync Projector"/"Sync Teleprompter"
+   * buttons) — just re-sends the current state to whichever socket asked. */
   socket.on("display:requestSync", () => {
-    io.emit("state:sync", state);
+    socket.emit("state:sync", state);
   });
 
   socket.on("disconnect", () => {
@@ -567,6 +789,7 @@ io.on("connection", (socket: Socket) => {
     if (mobileCameraId) {
       state.cameras = state.cameras.filter((camera) => camera.id !== mobileCameraId);
       socketCameraMap.delete(socket.id);
+      persistState();
       io.emit("camera:list", state.cameras);
     }
 
@@ -585,4 +808,11 @@ io.on("connection", (socket: Socket) => {
 server.listen(port, () => {
   console.log(`Socket server is running on ${publicHost}`);
   console.log(`Socket CORS origin(s): ${corsOrigins.join(", ")}`);
+  if (isAuthEnforced()) {
+    console.log("[Auth] Enforcing Firebase ID token verification for operator commands.");
+  } else if (authInitError()) {
+    console.warn(`[Auth] FIREBASE_SERVICE_ACCOUNT_KEY was set but failed to initialize (${authInitError()}). Falling back to UNAUTHENTICATED mode — every connected client can issue operator commands.`);
+  } else {
+    console.warn("[Auth] FIREBASE_SERVICE_ACCOUNT_KEY is not set — running in UNAUTHENTICATED mode. Any client that can reach this server can control the stream. See docs/DEPLOYMENT.md to enable auth.");
+  }
 });
