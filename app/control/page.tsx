@@ -1014,10 +1014,10 @@ export default function ControlPage() {
                   <input
                     type="number"
                     min={24}
-                    max={120}
+                    max={180}
                     value={projectorFontSize}
                     onChange={(e) => {
-                      const next = Math.min(120, Math.max(24, Number(e.target.value) || 24));
+                      const next = Math.min(180, Math.max(24, Number(e.target.value) || 24));
                       setProjectorFontSize(next);
                       socket.emit("display:projectorFontSize", next);
                     }}
