@@ -44,6 +44,9 @@ export default function ProjectorPage() {
   const slideTransition = currentSlide?.transition;
   const transitionClass = slideTransition ? `slide-transition-${slideTransition.type}` : "slide-transition-fade";
   const slideTextStyle = currentSlide?.textStyle;
+  const showRenderedImage = Boolean(
+    currentSlide?.renderedImage && (!currentSlide.text || currentSlide.text === "(Visual slide – no text)")
+  );
   const lyricStyle: CSSProperties = {
     fontFamily: slideTextStyle?.fontFamily || undefined,
     fontSize: `${projectorFontSize}px`,
@@ -233,7 +236,7 @@ export default function ProjectorPage() {
           {hasVideoStream && <video ref={videoRef} autoPlay muted playsInline className="projector-video-bg" />}
 
           <div className="projector-content-shell">
-            {currentSlide?.renderedImage ? (
+            {showRenderedImage ? (
               <img src={currentSlide.renderedImage} alt={displaySection} className="projector-rendered-image" />
             ) : (
               <>
@@ -284,7 +287,7 @@ export default function ProjectorPage() {
       {!standby && hasVideoStream && overlayEnabled && currentSlide && (
         <DraggableOverlay position={overlayPos} interactive={false} opacity={overlayOpacity} height={overlayHeight}>
           <div className={`overlay-lyrics projector-overlay-lyrics ${transitionClass}`}>
-            {currentSlide.renderedImage ? (
+            {showRenderedImage ? (
               <img src={currentSlide.renderedImage} alt={displaySection} style={{ maxWidth: "100%", borderRadius: 8 }} />
             ) : (
               <p style={lyricStyle}>{displayText}</p>
