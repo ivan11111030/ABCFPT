@@ -721,9 +721,9 @@ io.on("connection", (socket: Socket) => {
 
   socket.on("display:projectorFontSize", (size: number) => {
     if (!authGuard()) return;
-    state.projectorFontSize = size;
+    state.projectorFontSize = Number.isFinite(size) ? Math.max(0, size) : 0;
     persistState();
-    io.emit("display:projectorFontSize", size);
+    io.emit("display:projectorFontSize", state.projectorFontSize);
   });
   socket.on("stream:overlayOpacity", (opacity: number) => {
     if (!authGuard()) return;

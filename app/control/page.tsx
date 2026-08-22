@@ -1013,11 +1013,11 @@ export default function ControlPage() {
                   Projector font size
                   <input
                     type="number"
-                    min={24}
-                    max={180}
+                    min={0}
                     value={projectorFontSize}
                     onChange={(e) => {
-                      const next = Math.min(180, Math.max(24, Number(e.target.value) || 24));
+                      const parsed = Number(e.target.value);
+                      const next = Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
                       setProjectorFontSize(next);
                       socket.emit("display:projectorFontSize", next);
                     }}
