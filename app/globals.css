@@ -1697,7 +1697,7 @@ h1, h2, h3, p { margin: 0; }
   position: relative;
   z-index: 2;
   display: grid;
-  place-items: center;
+  align-items: center;
   gap: 1rem;
   width: min(92vw, 1180px);
   max-width: 100%;
@@ -1712,11 +1712,13 @@ h1, h2, h3, p { margin: 0; }
 
 .projector-line {
   margin: 0;
+  width: 100%;
   max-width: 100%;
   padding: 0 4px;
-  font-weight: 800;
-  line-height: 1.05;
+  line-height: 1.15;
   color: #fff;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   word-break: break-word;
   text-shadow:
     0 0 2px rgba(255, 255, 255, 0.9),
@@ -1727,6 +1729,7 @@ h1, h2, h3, p { margin: 0; }
 }
 
 .projector-section {
+  width: 100%;
   margin: 0;
   font-size: clamp(0.95rem, 1.2vw, 1.2rem);
   text-transform: uppercase;

@@ -19,7 +19,7 @@ export default function ProjectorPage() {
   const [overlayPos, setOverlayPos] = useState<OverlayPosition>(LAYOUT_PRESETS["lower-third"]);
   const [overlayOpacity, setOverlayOpacity] = useState(100);
   const [overlayHeight, setOverlayHeight] = useState(25);
-  const [projectorFontSize, setProjectorFontSize] = useState(140);
+  const [projectorFontSize, setProjectorFontSize] = useState(42);
   const [hasVideoStream, setHasVideoStream] = useState(false);
   const [connected, setConnected] = useState(false);
   const [standby, setStandby] = useState(false);
@@ -43,7 +43,15 @@ export default function ProjectorPage() {
   const currentSlide = song?.slides?.[safeSlideIndex] ?? song?.slides?.[0];
   const slideTransition = currentSlide?.transition;
   const transitionClass = slideTransition ? `slide-transition-${slideTransition.type}` : "slide-transition-fade";
-  const effectiveProjectorFontSize = Math.max(projectorFontSize, currentSlide?.textStyle?.fontSize ?? 0, 42);
+  const slideTextStyle = currentSlide?.textStyle;
+  const lyricStyle: CSSProperties = {
+    fontFamily: slideTextStyle?.fontFamily || undefined,
+    fontSize: `${projectorFontSize}px`,
+    color: slideTextStyle?.color ?? "#ffffff",
+    textAlign: slideTextStyle?.align ?? "center",
+    fontWeight: slideTextStyle?.bold === undefined ? 700 : slideTextStyle.bold ? 700 : 400,
+    fontStyle: slideTextStyle?.italic ? "italic" : "normal",
+  };
 
   useEffect(() => {
     if (slideIndex !== safeSlideIndex) {
@@ -72,6 +80,12 @@ export default function ProjectorPage() {
       if (serverState.standby !== undefined) setStandby(serverState.standby);
       if (serverState.background) setBackground(serverState.background as BackgroundConfig);
       if (serverState.currentScene) setActiveScene(serverState.currentScene);
+      if (serverState.sceneType) setActiveSceneType(serverState.sceneType as SceneType);
+      if (serverState.sceneConfig) {
+        const sceneConfig = serverState.sceneConfig as SceneConfig;
+        setSceneConfig(sceneConfig);
+        if (sceneConfig.background) setBackground(sceneConfig.background);
+      }
       if (serverState.projectorFontSize !== undefined) setProjectorFontSize(serverState.projectorFontSize);
     });
 
@@ -225,17 +239,11 @@ export default function ProjectorPage() {
               <>
                 <p
                   className={`projector-line ${transitionClass}`}
-                  style={{
-                    fontFamily: currentSlide?.textStyle?.fontFamily,
-                    fontSize: `${effectiveProjectorFontSize}px`,
-                    color: currentSlide?.textStyle?.color ?? "#ffffff",
-                    fontWeight: currentSlide?.textStyle?.bold ? 700 : 800,
-                    fontStyle: currentSlide?.textStyle?.italic ? "italic" : undefined,
-                  }}
+                  style={lyricStyle}
                 >
                   {displayText}
                 </p>
-                <p className="projector-section">
+                <p className="projector-section" style={{ textAlign: slideTextStyle?.align ?? "center" }}>
                   {displaySection} • {displayTitle}
                 </p>
               </>
@@ -279,7 +287,7 @@ export default function ProjectorPage() {
             {currentSlide.renderedImage ? (
               <img src={currentSlide.renderedImage} alt={displaySection} style={{ maxWidth: "100%", borderRadius: 8 }} />
             ) : (
-              <p>{displayText}</p>
+              <p style={lyricStyle}>{displayText}</p>
             )}
             <span className="overlay-section">{displaySection} • {displayTitle}</span>
           </div>
