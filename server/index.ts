@@ -76,7 +76,7 @@ function isValidCamera(value: unknown): value is Camera {
 }
 
 const CAMERA_TRANSITIONS = new Set(["cut", "fade", "cross-dissolve"]);
-const BACKGROUND_TYPES = new Set(["color", "image"]);
+const BACKGROUND_TYPES = new Set(["color", "image", "animated"]);
 
 /* ── Shared in-memory state ─────────────────────────── */
 

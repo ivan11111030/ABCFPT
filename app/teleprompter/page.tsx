@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { createSocketClient } from "@/src/lib/socket";
 import * as songStore from "@/src/lib/songStore";
-import type { Song } from "@/src/types/production";
+import type { BackgroundConfig, Song } from "@/src/types/production";
+import type { ServerStateSync } from "@/src/types/socketEvents";
 
 const socket = createSocketClient();
 
@@ -16,6 +17,7 @@ export default function TeleprompterPage() {
   const [darkMode, setDarkMode] = useState(true);
   const [connected, setConnected] = useState(false);
   const [showNav, setShowNav] = useState(false);
+  const [background, setBackground] = useState<BackgroundConfig>({ type: "color", value: "#000000", opacity: 100 });
 
   const song = songs.find((s) => s.id === currentSongId) ?? songs[0];
 
@@ -31,12 +33,13 @@ export default function TeleprompterPage() {
     socket.on("disconnect", () => setConnected(false));
 
     // Full state sync from server on connect
-    socket.on("state:sync", (serverState: any) => {
+    socket.on("state:sync", (serverState: ServerStateSync) => {
       setConnected(true);
-      if (serverState.songs?.length) songStore.mergeFromServer(serverState.songs);
+      if (serverState.songs?.length) songStore.mergeFromServer(serverState.songs as Song[]);
       if (serverState.currentSongId) setCurrentSongId(serverState.currentSongId);
       if (serverState.currentSlide !== undefined) setSlideIndex(serverState.currentSlide);
       if (serverState.teleprompterFontSize !== undefined) setFontSize(serverState.teleprompterFontSize);
+      if (serverState.background) setBackground(serverState.background as BackgroundConfig);
     });
 
     if (socket.connected) {
@@ -54,6 +57,7 @@ export default function TeleprompterPage() {
       setSlideIndex(0);
     });
     socket.on("song:list", (songList: Song[]) => songStore.setSongs(songList));
+    socket.on("control:background", (bg: BackgroundConfig) => setBackground(bg));
 
     const unsubscribe = songStore.subscribe(() => {
       setSongs(songStore.getSongs());
@@ -66,15 +70,35 @@ export default function TeleprompterPage() {
       socket.off("control:slide");
       socket.off("control:song");
       socket.off("song:list");
+      socket.off("control:background");
       unsubscribe();
     };
   }, []);
 
   const currentSlide = song?.slides[slideIndex] ?? song?.slides[0];
   const nextLine = song?.slides[slideIndex + 1]?.text ?? "";
+  const backgroundStyle: CSSProperties = {
+    position: "absolute",
+    inset: 0,
+    zIndex: 0,
+    opacity: (background.opacity ?? 100) / 100,
+  };
+
+  if (background.type === "color") {
+    backgroundStyle.background = background.value;
+  } else if (background.type === "image") {
+    backgroundStyle.backgroundImage = `url(${background.value})`;
+    backgroundStyle.backgroundSize = "cover";
+    backgroundStyle.backgroundPosition = "center";
+  } else {
+    backgroundStyle.background = background.value;
+    backgroundStyle.backgroundSize = "400% 400%";
+    backgroundStyle.animation = "bg-animate 8s ease infinite";
+  }
 
   return (
     <main className={darkMode ? "teleprompter-shell dark" : "teleprompter-shell"}>
+      <div style={backgroundStyle} />
       {/* Hidden nav bar - only visible on hover at top (same as projector) */}
       <div
         style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 30, padding: "8px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", opacity: showNav ? 1 : 0, transition: "opacity 0.3s", background: "rgba(0,0,0,0.75)", pointerEvents: showNav ? "auto" : "none" }}

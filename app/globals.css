@@ -1546,6 +1546,8 @@ h1, h2, h3, p { margin: 0; }
 
 /* ========== TELEPROMPTER ========== */
 .teleprompter-shell {
+  position: relative;
+  isolation: isolate;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -1559,6 +1561,8 @@ h1, h2, h3, p { margin: 0; }
 }
 
 .teleprompter-stage {
+  position: relative;
+  z-index: 1;
   flex: 1;
   display: grid;
   place-items: center;
@@ -1586,6 +1590,8 @@ h1, h2, h3, p { margin: 0; }
 }
 
 .teleprompter-footer {
+  position: relative;
+  z-index: 1;
   display: flex;
   justify-content: center;
   color: var(--muted);
@@ -1703,11 +1709,6 @@ h1, h2, h3, p { margin: 0; }
   max-width: 100%;
   padding: clamp(24px, 3vw, 40px);
   text-align: center;
-  border-radius: 32px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  backdrop-filter: blur(16px);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
 }
 
 .projector-line {

@@ -87,7 +87,7 @@ export default function ProjectorPage() {
       if (serverState.sceneConfig) {
         const sceneConfig = serverState.sceneConfig as SceneConfig;
         setSceneConfig(sceneConfig);
-        if (sceneConfig.background) setBackground(sceneConfig.background);
+        if (!serverState.background && sceneConfig.background) setBackground(sceneConfig.background);
       }
       if (serverState.projectorFontSize !== undefined) setProjectorFontSize(serverState.projectorFontSize);
     });
