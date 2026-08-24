@@ -18,6 +18,7 @@ export type Slide = {
   background?: string;
   /** Optional image attached to this slide */
   imageUrl?: string;
+  imagePlacement?: "background" | "inline" | "foreground";
   /** Per-slide text style overrides */
   textStyle?: TextStyle;
   /** Base64 rendered image of the original PPTX slide (preserves fonts/layout) */

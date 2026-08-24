@@ -55,6 +55,8 @@ export default function ProjectorPage() {
     fontWeight: slideTextStyle?.bold === undefined ? 700 : slideTextStyle.bold ? 700 : 400,
     fontStyle: slideTextStyle?.italic ? "italic" : "normal",
   };
+  const slideImage = currentSlide?.imageUrl;
+  const slideImagePlacement = currentSlide?.imagePlacement ?? "foreground";
 
   useEffect(() => {
     if (slideIndex !== safeSlideIndex) {
@@ -240,13 +242,15 @@ export default function ProjectorPage() {
               <img src={currentSlide.renderedImage} alt={displaySection} className="projector-rendered-image" />
             ) : (
               <>
-                {currentSlide?.imageUrl && <img src={currentSlide.imageUrl} alt={displaySection} className="projector-slide-image" />}
+                {slideImage && slideImagePlacement === "background" && <img src={slideImage} alt="" className="projector-slide-image projector-slide-image-background" />}
+                {slideImage && slideImagePlacement === "inline" && <img src={slideImage} alt="" className="projector-slide-image projector-slide-image-inline" />}
                 <p
                   className={`projector-line ${transitionClass}`}
                   style={lyricStyle}
                 >
                   {displayText}
                 </p>
+                {slideImage && slideImagePlacement === "foreground" && <img src={slideImage} alt="" className="projector-slide-image" />}
                 <p className="projector-section" style={{ textAlign: slideTextStyle?.align ?? "center" }}>
                   {displaySection} • {displayTitle}
                 </p>
@@ -292,7 +296,7 @@ export default function ProjectorPage() {
               <img src={currentSlide.renderedImage} alt={displaySection} style={{ maxWidth: "100%", borderRadius: 8 }} />
             ) : (
               <>
-                {currentSlide.imageUrl && <img src={currentSlide.imageUrl} alt={displaySection} className="projector-slide-image" />}
+                {slideImage && slideImagePlacement !== "background" && <img src={slideImage} alt="" className="projector-slide-image" />}
                 <p style={lyricStyle}>{displayText}</p>
               </>
             )}

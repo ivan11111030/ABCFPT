@@ -1004,6 +1004,31 @@ h1, h2, h3, p { margin: 0; }
   object-fit: contain;
 }
 
+.slide-preview-body {
+  position: relative;
+  overflow: hidden;
+}
+
+.slide-preview-image-background {
+  position: absolute;
+  inset: 10px;
+  z-index: 0;
+  width: calc(100% - 20px);
+  height: calc(100% - 20px);
+  max-height: none;
+  opacity: 0.35;
+}
+
+.slide-preview-image-inline,
+.slide-preview-image-foreground {
+  z-index: 1;
+}
+
+.slide-preview-body p {
+  position: relative;
+  z-index: 1;
+}
+
 .camera-panel-header {
   align-items: center;
   justify-content: space-between;
@@ -1181,6 +1206,79 @@ h1, h2, h3, p { margin: 0; }
   margin: 0 auto 24px;
   border-radius: 10px;
   object-fit: contain;
+}
+
+.projector-slide-image-background {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  max-height: none;
+  opacity: 0.42;
+}
+
+.projector-slide-image-inline {
+  margin-bottom: 18px;
+}
+
+.slide-edit-field,
+.slide-font-controls label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.slide-edit-field select,
+.slide-font-controls select,
+.slide-font-controls input {
+  min-height: 30px;
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
+.slide-font-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}
+
+.slide-font-controls label:first-child {
+  min-width: 150px;
+}
+
+.slide-font-controls input[type="number"] {
+  width: 64px;
+}
+
+.slide-font-controls input[type="color"] {
+  width: 42px;
+  padding: 2px;
+}
+
+.slide-font-controls > button {
+  width: 32px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.slide-font-controls > button.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #000;
+}
+
+.slide-font-controls > button.italic {
+  font-style: italic;
 }
 
 .slide-edit-modal {

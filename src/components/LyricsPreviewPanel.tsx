@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState } from "react";
 import type { Slide, Song } from "@/src/types/production";
 
+const SLIDE_FONTS = ["Inter", "Arial", "Georgia", "Merriweather", "Roboto", "Oswald", "Montserrat", "Open Sans"];
+
 type LyricsPreviewPanelProps = {
   song: Song;
   currentSlide: number;
@@ -58,6 +60,12 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
     setDraftText(lines.map((line, index) => type === "bullet" ? `• ${line}` : `${index + 1}. ${line}`).join("\n"));
   };
 
+  const updateEditingStyle = (patch: Slide["textStyle"]) => {
+    if (editingIndex === null || !onUpdateSlide) return;
+    const slide = song.slides[editingIndex];
+    onUpdateSlide(editingIndex, { textStyle: { ...slide.textStyle, ...patch } });
+  };
+
   const editControls = (slide: Slide, index: number) => (
     <button type="button" className="slide-edit-button" onClick={(event) => { event.stopPropagation(); startEditing(slide, index); }}>
       Edit text
@@ -97,7 +105,7 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
               <span>Current</span>
             </div>
             <div className="slide-preview-body">
-              {song.slides[currentSlide]?.imageUrl && <img src={song.slides[currentSlide].imageUrl} alt="Slide attachment" className="slide-preview-image" />}
+              {song.slides[currentSlide]?.imageUrl && <img src={song.slides[currentSlide].imageUrl} alt="Slide attachment" className={`slide-preview-image slide-preview-image-${song.slides[currentSlide].imagePlacement ?? "foreground"}`} />}
               <p style={{ textAlign: song.slides[currentSlide]?.textStyle?.align ?? "center" }}>{currentText}</p>
             </div>
           </div>
@@ -113,7 +121,7 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
                 onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onJumpToSlide?.(index); }}
               >
                 <div className="slide-thumbnail-number">{index + 1}</div>
-                {slide.imageUrl && <img src={slide.imageUrl} alt="" className="slide-card-image" />}
+                {slide.imageUrl && <img src={slide.imageUrl} alt="" className={`slide-card-image slide-card-image-${slide.imagePlacement ?? "foreground"}`} />}
                 <div className="slide-thumbnail-text" style={{ textAlign: slide.textStyle?.align ?? "center" }}>{slide.text}</div>
                 {onUpdateSlide && editControls(slide, index)}
                 {alignmentButtons(slide, index)}
@@ -142,7 +150,7 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
                 onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onJumpToSlide?.(index); }}
               >
                 <span className="slide-list-number">{index + 1}</span>
-                {slide.imageUrl && <img src={slide.imageUrl} alt="" className="slide-card-image" />}
+                {slide.imageUrl && <img src={slide.imageUrl} alt="" className={`slide-card-image slide-card-image-${slide.imagePlacement ?? "foreground"}`} />}
                 <span className="slide-list-text" style={{ textAlign: slide.textStyle?.align ?? "center" }}>{slide.text}</span>
                 {onUpdateSlide && editControls(slide, index)}
                 {alignmentButtons(slide, index)}
@@ -170,9 +178,27 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
             {song.slides[editingIndex].imageUrl && (
               <div className="slide-edit-image-preview">
                 <img src={song.slides[editingIndex].imageUrl} alt="Slide attachment" />
+                <label className="slide-edit-field">
+                  Image placement
+                  <select
+                    value={song.slides[editingIndex].imagePlacement ?? "foreground"}
+                    onChange={(event) => onUpdateSlide(editingIndex, { imagePlacement: event.target.value as Slide["imagePlacement"] })}
+                  >
+                    <option value="background">Background</option>
+                    <option value="inline">Inside text</option>
+                    <option value="foreground">Foreground</option>
+                  </select>
+                </label>
                 <button type="button" className="button subtle" onClick={() => onUpdateSlide(editingIndex, { imageUrl: undefined })}>Remove image</button>
               </div>
             )}
+            <div className="slide-font-controls">
+              <label>Font<select value={song.slides[editingIndex].textStyle?.fontFamily ?? "Inter"} onChange={(event) => updateEditingStyle({ fontFamily: event.target.value })}>{SLIDE_FONTS.map((font) => <option key={font}>{font}</option>)}</select></label>
+              <label>Size<input type="number" min={10} max={160} value={song.slides[editingIndex].textStyle?.fontSize ?? 42} onChange={(event) => updateEditingStyle({ fontSize: Number(event.target.value) || 10 })} /></label>
+              <label>Color<input type="color" value={song.slides[editingIndex].textStyle?.color ?? "#ffffff"} onChange={(event) => updateEditingStyle({ color: event.target.value })} /></label>
+              <button type="button" className={song.slides[editingIndex].textStyle?.bold ? "active" : ""} onClick={() => updateEditingStyle({ bold: !song.slides[editingIndex].textStyle?.bold })}>B</button>
+              <button type="button" className={song.slides[editingIndex].textStyle?.italic ? "active italic" : "italic"} onClick={() => updateEditingStyle({ italic: !song.slides[editingIndex].textStyle?.italic })}>I</button>
+            </div>
             <textarea
               className="slide-edit-modal-textarea"
               value={draftText}
