@@ -16,6 +16,8 @@ export type Slide = {
   text: string;
   notes?: string;
   background?: string;
+  /** Optional image attached to this slide */
+  imageUrl?: string;
   /** Per-slide text style overrides */
   textStyle?: TextStyle;
   /** Base64 rendered image of the original PPTX slide (preserves fonts/layout) */

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { Slide, Song } from "@/src/types/production";
 
 type LyricsPreviewPanelProps = {
@@ -16,6 +16,7 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
   const [thumbnailView, setThumbnailView] = useState(true);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [draftText, setDraftText] = useState("");
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const currentText = song.slides[currentSlide]?.text ?? "";
   const nextText = song.slides[currentSlide + 1]?.text ?? "End of song";
@@ -43,6 +44,13 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
   const startEditing = (slide: Slide, index: number) => {
     setEditingIndex(index);
     setDraftText(slide.text);
+  };
+
+  const attachImage = (file: File) => {
+    if (!file.type.startsWith("image/") || file.size > 8 * 1024 * 1024 || editingIndex === null) return;
+    const reader = new FileReader();
+    reader.onload = () => onUpdateSlide?.(editingIndex, { imageUrl: reader.result as string });
+    reader.readAsDataURL(file);
   };
 
   const formatDraft = (type: "bullet" | "number") => {
@@ -89,6 +97,7 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
               <span>Current</span>
             </div>
             <div className="slide-preview-body">
+              {song.slides[currentSlide]?.imageUrl && <img src={song.slides[currentSlide].imageUrl} alt="Slide attachment" className="slide-preview-image" />}
               <p style={{ textAlign: song.slides[currentSlide]?.textStyle?.align ?? "center" }}>{currentText}</p>
             </div>
           </div>
@@ -104,6 +113,7 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
                 onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onJumpToSlide?.(index); }}
               >
                 <div className="slide-thumbnail-number">{index + 1}</div>
+                {slide.imageUrl && <img src={slide.imageUrl} alt="" className="slide-card-image" />}
                 <div className="slide-thumbnail-text" style={{ textAlign: slide.textStyle?.align ?? "center" }}>{slide.text}</div>
                 {onUpdateSlide && editControls(slide, index)}
                 {alignmentButtons(slide, index)}
@@ -132,6 +142,7 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
                 onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onJumpToSlide?.(index); }}
               >
                 <span className="slide-list-number">{index + 1}</span>
+                {slide.imageUrl && <img src={slide.imageUrl} alt="" className="slide-card-image" />}
                 <span className="slide-list-text" style={{ textAlign: slide.textStyle?.align ?? "center" }}>{slide.text}</span>
                 {onUpdateSlide && editControls(slide, index)}
                 {alignmentButtons(slide, index)}
@@ -153,7 +164,15 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
             <div className="slide-text-toolbar">
               <button type="button" onClick={() => formatDraft("bullet")}>• Bullets</button>
               <button type="button" onClick={() => formatDraft("number")}>1. Numbered</button>
+              <button type="button" onClick={() => imageInputRef.current?.click()}>Add image</button>
+              <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) attachImage(file); event.target.value = ""; }} />
             </div>
+            {song.slides[editingIndex].imageUrl && (
+              <div className="slide-edit-image-preview">
+                <img src={song.slides[editingIndex].imageUrl} alt="Slide attachment" />
+                <button type="button" className="button subtle" onClick={() => onUpdateSlide(editingIndex, { imageUrl: undefined })}>Remove image</button>
+              </div>
+            )}
             <textarea
               className="slide-edit-modal-textarea"
               value={draftText}

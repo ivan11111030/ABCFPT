@@ -997,6 +997,13 @@ h1, h2, h3, p { margin: 0; }
   text-align: center;
 }
 
+.slide-preview-image {
+  width: min(100%, 520px);
+  max-height: 220px;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
 .camera-panel-header {
   align-items: center;
   justify-content: space-between;
@@ -1045,6 +1052,13 @@ h1, h2, h3, p { margin: 0; }
   line-height: 1.5;
   color: var(--text);
   width: 100%;
+}
+
+.slide-card-image {
+  width: 100%;
+  max-height: 90px;
+  border-radius: 6px;
+  object-fit: cover;
 }
 
 .slide-alignment {
@@ -1137,6 +1151,36 @@ h1, h2, h3, p { margin: 0; }
   min-height: 28px;
   padding: 4px 9px;
   font-size: 10px;
+}
+
+.slide-edit-image-preview {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.slide-edit-image-preview img {
+  width: 100%;
+  max-height: 220px;
+  border-radius: 8px;
+  object-fit: contain;
+  background: #000;
+}
+
+.slide-edit-image-preview .button {
+  min-height: 28px;
+  min-width: 0;
+  padding: 4px 9px;
+  font-size: 10px;
+}
+
+.projector-slide-image {
+  display: block;
+  width: min(100%, 900px);
+  max-height: 48vh;
+  margin: 0 auto 24px;
+  border-radius: 10px;
+  object-fit: contain;
 }
 
 .slide-edit-modal {

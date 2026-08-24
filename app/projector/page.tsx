@@ -240,6 +240,7 @@ export default function ProjectorPage() {
               <img src={currentSlide.renderedImage} alt={displaySection} className="projector-rendered-image" />
             ) : (
               <>
+                {currentSlide?.imageUrl && <img src={currentSlide.imageUrl} alt={displaySection} className="projector-slide-image" />}
                 <p
                   className={`projector-line ${transitionClass}`}
                   style={lyricStyle}
@@ -290,7 +291,10 @@ export default function ProjectorPage() {
             {showRenderedImage ? (
               <img src={currentSlide.renderedImage} alt={displaySection} style={{ maxWidth: "100%", borderRadius: 8 }} />
             ) : (
-              <p style={lyricStyle}>{displayText}</p>
+              <>
+                {currentSlide.imageUrl && <img src={currentSlide.imageUrl} alt={displaySection} className="projector-slide-image" />}
+                <p style={lyricStyle}>{displayText}</p>
+              </>
             )}
             <span className="overlay-section">{displaySection} • {displayTitle}</span>
           </div>
