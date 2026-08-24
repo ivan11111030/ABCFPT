@@ -66,7 +66,6 @@ export default function ControlPage() {
   const [standby, setStandby] = useState(false);
   const [background, setBackground] = useState<BackgroundConfig>({ type: "color", value: "#000000", opacity: 100 });
   const [teleprompterFontSize, setTeleprompterFontSize] = useState(42);
-  const [projectorFontSize, setProjectorFontSize] = useState(42);
   const [streamStatus, setStreamStatus] = useState("");
   const [programFlash, setProgramFlash] = useState(false);
   const [showSongManager, setShowSongManager] = useState(false);
@@ -148,11 +147,9 @@ export default function ControlPage() {
       if (serverState.standby !== undefined) setStandby(serverState.standby);
       if (serverState.background) setBackground(serverState.background);
       if (serverState.teleprompterFontSize !== undefined) setTeleprompterFontSize(serverState.teleprompterFontSize);
-      if (serverState.projectorFontSize !== undefined) setProjectorFontSize(serverState.projectorFontSize);
     });
 
     socket.on("display:teleprompterFontSize", (size: number) => setTeleprompterFontSize(size));
-    socket.on("display:projectorFontSize", (size: number) => setProjectorFontSize(size));
 
     socket.on("stream:stopped", (payload: { reason?: string }) => {
       setIsLive(false);
@@ -300,7 +297,6 @@ export default function ControlPage() {
       socket.off("stream:overlayToggled");
       socket.off("stream:overlayPosition");
       socket.off("display:teleprompterFontSize");
-      socket.off("display:projectorFontSize");
       socket.off("mobile-camera:joined");
       socket.off("mobile-camera:offer");
       socket.off("mobile-camera:candidate");
@@ -1041,21 +1037,9 @@ export default function ControlPage() {
                     style={{ width: 80, padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", color: "var(--text)" }}
                   />
                 </label>
-                <label style={{ display: "grid", gap: 4, fontSize: 12 }}>
-                  Projector font size
-                  <input
-                    type="number"
-                    min={0}
-                    value={projectorFontSize}
-                    onChange={(e) => {
-                      const parsed = Number(e.target.value);
-                      const next = Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
-                      setProjectorFontSize(next);
-                      socket.emit("display:projectorFontSize", next);
-                    }}
-                    style={{ width: 80, padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", color: "var(--text)" }}
-                  />
-                </label>
+                <p style={{ fontSize: 12, color: "var(--muted)", alignSelf: "end" }}>
+                  Projector uses the teleprompter size
+                </p>
               </div>
               <button type="button" className="button primary" onClick={reconnectDisplays}>
                 Reconnect Displays

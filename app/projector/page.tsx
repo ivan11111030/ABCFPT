@@ -91,10 +91,17 @@ export default function ProjectorPage() {
         setSceneConfig(sceneConfig);
         if (!serverState.background && sceneConfig.background) setBackground(sceneConfig.background);
       }
-      if (serverState.projectorFontSize !== undefined) setProjectorFontSize(serverState.projectorFontSize);
+      if (serverState.teleprompterFontSize !== undefined) {
+        setProjectorFontSize(serverState.teleprompterFontSize);
+      } else if (serverState.projectorFontSize !== undefined) {
+        setProjectorFontSize(serverState.projectorFontSize);
+      }
     });
 
     socket.on("display:projectorFontSize", (size: number) => {
+      setProjectorFontSize(size);
+    });
+    socket.on("display:teleprompterFontSize", (size: number) => {
       setProjectorFontSize(size);
     });
 
@@ -181,6 +188,7 @@ export default function ProjectorPage() {
       socket.off("stream:overlayHeight");
       socket.off("stream:canvaOverlay");
       socket.off("display:projectorFontSize");
+      socket.off("display:teleprompterFontSize");
       socket.off("projector:offer");
       socket.off("projector:candidate");
       pcRef.current?.close();

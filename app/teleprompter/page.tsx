@@ -121,10 +121,10 @@ export default function TeleprompterPage() {
       <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: 30, zIndex: 31 }} onMouseEnter={() => setShowNav(true)} />
 
       <section className="teleprompter-stage" style={{ fontSize }}>
-        <div>
-          <p className="teleprompter-current" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{currentSlide?.text}</p>
+        <div style={{ width: "100%" }}>
+          <p className="teleprompter-current" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", textAlign: currentSlide?.textStyle?.align ?? "center" }}>{currentSlide?.text}</p>
           {nextLine && (
-            <p className="teleprompter-next">
+            <p className="teleprompter-next" style={{ textAlign: currentSlide?.textStyle?.align ?? "center" }}>
               Next: {nextLine}
             </p>
           )}

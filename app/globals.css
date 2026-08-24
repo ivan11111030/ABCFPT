@@ -1621,11 +1621,28 @@ h1, h2, h3, p { margin: 0; }
 .control-right .panel-header,
 .control-right .studio-panel > .panel-header {
   min-height: 34px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.control-right .panel-header > * {
+  min-width: 0;
+}
+
+.control-right .panel-header > :first-child {
+  flex: 1 1 110px;
+}
+
+.control-right .panel-header .button {
+  flex: 0 1 auto;
+  max-width: 100%;
+  white-space: normal;
 }
 
 .control-right .panel-header p {
   font-size: 13px;
   letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
 }
 
 .control-right input,
@@ -1679,6 +1696,7 @@ h1, h2, h3, p { margin: 0; }
 .local-camera-panel {
   min-width: 0;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .studio-panel .panel-header,
@@ -2066,7 +2084,7 @@ h1, h2, h3, p { margin: 0; }
   font-weight: 800;
   line-height: 1.25;
   color: var(--text);
-  font-size: clamp(3rem, 5vw, 6rem);
+  font-size: 1em;
   max-width: 90ch;
   letter-spacing: -0.03em;
 }

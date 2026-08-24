@@ -721,16 +721,22 @@ io.on("connection", (socket: Socket) => {
   });
   socket.on("display:teleprompterFontSize", (size: number) => {
     if (!authGuard()) return;
-    state.teleprompterFontSize = size;
+    const nextSize = Number.isFinite(size) ? Math.min(120, Math.max(24, size)) : 42;
+    state.teleprompterFontSize = nextSize;
+    state.projectorFontSize = nextSize;
     persistState();
-    io.emit("display:teleprompterFontSize", size);
+    io.emit("display:teleprompterFontSize", nextSize);
+    io.emit("display:projectorFontSize", nextSize);
   });
 
   socket.on("display:projectorFontSize", (size: number) => {
     if (!authGuard()) return;
-    state.projectorFontSize = Number.isFinite(size) ? Math.max(0, size) : 0;
+    const nextSize = Number.isFinite(size) ? Math.min(120, Math.max(24, size)) : 42;
+    state.teleprompterFontSize = nextSize;
+    state.projectorFontSize = nextSize;
     persistState();
-    io.emit("display:projectorFontSize", state.projectorFontSize);
+    io.emit("display:teleprompterFontSize", nextSize);
+    io.emit("display:projectorFontSize", nextSize);
   });
   socket.on("stream:overlayOpacity", (opacity: number) => {
     if (!authGuard()) return;
