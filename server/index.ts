@@ -255,9 +255,13 @@ function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingPr
     ];
 
     ffmpegProcess = spawn(FFMPEG_PATH, args, { stdio: ["pipe", "pipe", "pipe"] });
+    let lastFfmpegError = "";
 
     ffmpegProcess.stderr?.on("data", (data: Buffer) => {
       const msg = data.toString();
+      const meaningfulLines = msg.split(/\r?\n/).filter((line) => line.trim());
+      const errorLine = meaningfulLines.find((line) => /error|failed|denied|refused|invalid/i.test(line));
+      if (errorLine) lastFfmpegError = errorLine.trim();
       // Only log meaningful lines (skip progress spam)
       if (msg.includes("Error") || msg.includes("error") || msg.includes("failed") || msg.includes("Opening") || msg.includes("Output")) {
         console.log(`[FFmpeg] ${msg.trim()}`);
@@ -277,9 +281,9 @@ function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingPr
       if (state.isLive) {
         state.isLive = false;
         if (code !== 0) {
-          io.emit("stream:error", { message: `Stream ended unexpectedly (code ${code})` });
+          io.emit("stream:error", { message: lastFfmpegError || `Stream ended unexpectedly (code ${code})` });
         }
-        io.emit("stream:stopped", { status: "stopped" });
+        io.emit("stream:stopped", { status: "stopped", reason: lastFfmpegError || undefined });
       }
       ffmpegProcess = null;
     });

@@ -154,9 +154,9 @@ export default function ControlPage() {
     socket.on("display:teleprompterFontSize", (size: number) => setTeleprompterFontSize(size));
     socket.on("display:projectorFontSize", (size: number) => setProjectorFontSize(size));
 
-    socket.on("stream:stopped", () => {
+    socket.on("stream:stopped", (payload: { reason?: string }) => {
       setIsLive(false);
-      setStreamStatus("Stopped");
+      setStreamStatus(payload?.reason ? `Error: ${payload.reason}` : "Stopped");
       // Clean up client-side recording
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
         mediaRecorderRef.current.stop();
@@ -166,6 +166,10 @@ export default function ControlPage() {
         cancelAnimationFrame(animFrameRef.current);
         animFrameRef.current = 0;
       }
+    });
+    socket.on("stream:started", () => {
+      setIsLive(true);
+      setStreamStatus("Live");
     });
     socket.on("stream:error", (err: { message: string }) => {
       setStreamStatus(`Error: ${err.message}`);
