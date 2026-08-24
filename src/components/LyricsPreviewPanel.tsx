@@ -19,6 +19,7 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [draftText, setDraftText] = useState("");
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
   const currentText = song.slides[currentSlide]?.text ?? "";
   const nextText = song.slides[currentSlide + 1]?.text ?? "End of song";
@@ -55,9 +56,22 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
     reader.readAsDataURL(file);
   };
 
-  const formatDraft = (type: "bullet" | "number") => {
-    const lines = draftText.split("\n").map((line) => line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, ""));
-    setDraftText(lines.map((line, index) => type === "bullet" ? `• ${line}` : `${index + 1}. ${line}`).join("\n"));
+  const formatSelection = (type: "bullet" | "number" | "indent") => {
+    const textarea = textAreaRef.current;
+    const start = textarea?.selectionStart ?? 0;
+    const end = textarea?.selectionEnd ?? draftText.length;
+    const selectedText = draftText.slice(start, end);
+    if (!selectedText.trim()) return;
+    const formatted = selectedText.split("\n").map((line, index) => {
+      if (type === "indent") return `  ${line}`;
+      const content = line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "");
+      return type === "bullet" ? `• ${content}` : `${index + 1}. ${content}`;
+    }).join("\n");
+    setDraftText(`${draftText.slice(0, start)}${formatted}${draftText.slice(end)}`);
+    requestAnimationFrame(() => {
+      textarea?.focus();
+      textarea?.setSelectionRange(start, start + formatted.length);
+    });
   };
 
   const updateEditingStyle = (patch: Slide["textStyle"]) => {
@@ -160,18 +174,18 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
         </div>
       )}
       {editingIndex !== null && onUpdateSlide && song.slides[editingIndex] && (
-        <div className="slide-edit-modal" role="dialog" aria-modal="true" aria-labelledby="slide-edit-title" onClick={(event) => { if (event.target === event.currentTarget) setEditingIndex(null); }}>
+        <div className="slide-edit-modal" role="dialog" aria-modal="true" aria-labelledby="slide-edit-title">
           <div className="slide-edit-modal-content">
             <div className="slide-edit-modal-header">
               <div>
                 <p className="slide-label">Editing Slide {editingIndex + 1}</p>
                 <h2 id="slide-edit-title">{song.slides[editingIndex].section || "Slide text"}</h2>
               </div>
-              <button type="button" className="button subtle" aria-label="Close slide editor" onClick={() => setEditingIndex(null)}>✕</button>
             </div>
             <div className="slide-text-toolbar">
-              <button type="button" onClick={() => formatDraft("bullet")}>• Bullets</button>
-              <button type="button" onClick={() => formatDraft("number")}>1. Numbered</button>
+              <button type="button" onClick={() => formatSelection("bullet")}>• Bullets</button>
+              <button type="button" onClick={() => formatSelection("number")}>1. Numbered</button>
+              <button type="button" onClick={() => formatSelection("indent")}>Indent</button>
               <button type="button" onClick={() => imageInputRef.current?.click()}>Add image</button>
               <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) attachImage(file); event.target.value = ""; }} />
             </div>
@@ -201,6 +215,7 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
             </div>
             <textarea
               className="slide-edit-modal-textarea"
+              ref={textAreaRef}
               value={draftText}
               onChange={(event) => setDraftText(event.target.value)}
               autoFocus
