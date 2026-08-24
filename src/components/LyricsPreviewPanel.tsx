@@ -50,25 +50,7 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
     setDraftText(lines.map((line, index) => type === "bullet" ? `• ${line}` : `${index + 1}. ${line}`).join("\n"));
   };
 
-  const editControls = (slide: Slide, index: number) => editingIndex === index ? (
-    <div className="slide-text-editor" onClick={(event) => event.stopPropagation()}>
-      <div className="slide-text-toolbar">
-        <button type="button" onClick={() => formatDraft("bullet")}>• Bullets</button>
-        <button type="button" onClick={() => formatDraft("number")}>1. Numbered</button>
-      </div>
-      <textarea
-        value={draftText}
-        onChange={(event) => setDraftText(event.target.value)}
-        rows={5}
-        autoFocus
-        aria-label={`Edit text for slide ${index + 1}`}
-      />
-      <div className="slide-text-editor-actions">
-        <button type="button" className="button primary" onClick={() => { onUpdateSlide?.(index, { text: draftText }); setEditingIndex(null); }}>Save</button>
-        <button type="button" className="button subtle" onClick={() => setEditingIndex(null)}>Cancel</button>
-      </div>
-    </div>
-  ) : (
+  const editControls = (slide: Slide, index: number) => (
     <button type="button" className="slide-edit-button" onClick={(event) => { event.stopPropagation(); startEditing(slide, index); }}>
       Edit text
     </button>
@@ -122,8 +104,8 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
                 onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onJumpToSlide?.(index); }}
               >
                 <div className="slide-thumbnail-number">{index + 1}</div>
-                {editingIndex === index ? editControls(slide, index) : <div className="slide-thumbnail-text" style={{ textAlign: slide.textStyle?.align ?? "center" }}>{slide.text}</div>}
-                {onUpdateSlide && editingIndex !== index && editControls(slide, index)}
+                <div className="slide-thumbnail-text" style={{ textAlign: slide.textStyle?.align ?? "center" }}>{slide.text}</div>
+                {onUpdateSlide && editControls(slide, index)}
                 {alignmentButtons(slide, index)}
               </div>
             ))}
@@ -150,11 +132,39 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
                 onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onJumpToSlide?.(index); }}
               >
                 <span className="slide-list-number">{index + 1}</span>
-                {editingIndex === index ? editControls(slide, index) : <span className="slide-list-text" style={{ textAlign: slide.textStyle?.align ?? "center" }}>{slide.text}</span>}
-                {onUpdateSlide && editingIndex !== index && editControls(slide, index)}
+                <span className="slide-list-text" style={{ textAlign: slide.textStyle?.align ?? "center" }}>{slide.text}</span>
+                {onUpdateSlide && editControls(slide, index)}
                 {alignmentButtons(slide, index)}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+      {editingIndex !== null && onUpdateSlide && song.slides[editingIndex] && (
+        <div className="slide-edit-modal" role="dialog" aria-modal="true" aria-labelledby="slide-edit-title" onClick={(event) => { if (event.target === event.currentTarget) setEditingIndex(null); }}>
+          <div className="slide-edit-modal-content">
+            <div className="slide-edit-modal-header">
+              <div>
+                <p className="slide-label">Editing Slide {editingIndex + 1}</p>
+                <h2 id="slide-edit-title">{song.slides[editingIndex].section || "Slide text"}</h2>
+              </div>
+              <button type="button" className="button subtle" aria-label="Close slide editor" onClick={() => setEditingIndex(null)}>✕</button>
+            </div>
+            <div className="slide-text-toolbar">
+              <button type="button" onClick={() => formatDraft("bullet")}>• Bullets</button>
+              <button type="button" onClick={() => formatDraft("number")}>1. Numbered</button>
+            </div>
+            <textarea
+              className="slide-edit-modal-textarea"
+              value={draftText}
+              onChange={(event) => setDraftText(event.target.value)}
+              autoFocus
+              aria-label={`Edit text for slide ${editingIndex + 1}`}
+            />
+            <div className="slide-text-editor-actions">
+              <button type="button" className="button primary" onClick={() => { onUpdateSlide(editingIndex, { text: draftText }); setEditingIndex(null); }}>Save Changes</button>
+              <button type="button" className="button subtle" onClick={() => setEditingIndex(null)}>Cancel</button>
+            </div>
           </div>
         </div>
       )}

@@ -1139,6 +1139,75 @@ h1, h2, h3, p { margin: 0; }
   font-size: 10px;
 }
 
+.slide-edit-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(2, 6, 23, 0.78);
+  backdrop-filter: blur(5px);
+}
+
+.slide-edit-modal-content {
+  display: grid;
+  gap: 14px;
+  width: min(760px, 100%);
+  max-height: min(680px, calc(100vh - 40px));
+  padding: 22px;
+  overflow: auto;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  background: var(--bg);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+}
+
+.slide-edit-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.slide-edit-modal-header h2 {
+  font-size: 20px;
+}
+
+.slide-edit-modal-textarea {
+  width: 100%;
+  min-height: 280px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.slide-edit-modal-textarea:focus {
+  border-color: var(--accent);
+  outline: 2px solid rgba(79, 195, 247, 0.2);
+}
+
+@media (max-width: 600px) {
+  .slide-edit-modal {
+    padding: 12px;
+  }
+
+  .slide-edit-modal-content {
+    max-height: calc(100vh - 24px);
+    padding: 16px;
+  }
+
+  .slide-edit-modal-textarea {
+    min-height: 220px;
+  }
+}
+
 .lyrics-list-view {
   display: grid;
   gap: var(--sp-2);
