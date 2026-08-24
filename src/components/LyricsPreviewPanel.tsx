@@ -14,6 +14,8 @@ type LyricsPreviewPanelProps = {
 
 export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggleOverlay, onToggleFullScreen, isFullScreen, onJumpToSlide, onUpdateSlide }: LyricsPreviewPanelProps) {
   const [thumbnailView, setThumbnailView] = useState(true);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [draftText, setDraftText] = useState("");
 
   const currentText = song.slides[currentSlide]?.text ?? "";
   const nextText = song.slides[currentSlide + 1]?.text ?? "End of song";
@@ -36,6 +38,40 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
         </button>
       ))}
     </div>
+  );
+
+  const startEditing = (slide: Slide, index: number) => {
+    setEditingIndex(index);
+    setDraftText(slide.text);
+  };
+
+  const formatDraft = (type: "bullet" | "number") => {
+    const lines = draftText.split("\n").map((line) => line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, ""));
+    setDraftText(lines.map((line, index) => type === "bullet" ? `• ${line}` : `${index + 1}. ${line}`).join("\n"));
+  };
+
+  const editControls = (slide: Slide, index: number) => editingIndex === index ? (
+    <div className="slide-text-editor" onClick={(event) => event.stopPropagation()}>
+      <div className="slide-text-toolbar">
+        <button type="button" onClick={() => formatDraft("bullet")}>• Bullets</button>
+        <button type="button" onClick={() => formatDraft("number")}>1. Numbered</button>
+      </div>
+      <textarea
+        value={draftText}
+        onChange={(event) => setDraftText(event.target.value)}
+        rows={5}
+        autoFocus
+        aria-label={`Edit text for slide ${index + 1}`}
+      />
+      <div className="slide-text-editor-actions">
+        <button type="button" className="button primary" onClick={() => { onUpdateSlide?.(index, { text: draftText }); setEditingIndex(null); }}>Save</button>
+        <button type="button" className="button subtle" onClick={() => setEditingIndex(null)}>Cancel</button>
+      </div>
+    </div>
+  ) : (
+    <button type="button" className="slide-edit-button" onClick={(event) => { event.stopPropagation(); startEditing(slide, index); }}>
+      Edit text
+    </button>
   );
 
   const thumbnailSlides = useMemo(
@@ -77,16 +113,19 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
 
           <div className="slide-thumbnail-strip">
             {thumbnailSlides.map((slide, index) => (
-              <button
+              <div
                 key={slide.id}
-                type="button"
                 className={`slide-thumbnail ${index === currentSlide ? "active" : ""}`}
+                role="button"
+                tabIndex={0}
                 onClick={() => onJumpToSlide?.(index)}
+                onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onJumpToSlide?.(index); }}
               >
                 <div className="slide-thumbnail-number">{index + 1}</div>
-                <div className="slide-thumbnail-text" style={{ textAlign: slide.textStyle?.align ?? "center" }}>{slide.text}</div>
+                {editingIndex === index ? editControls(slide, index) : <div className="slide-thumbnail-text" style={{ textAlign: slide.textStyle?.align ?? "center" }}>{slide.text}</div>}
+                {onUpdateSlide && editingIndex !== index && editControls(slide, index)}
                 {alignmentButtons(slide, index)}
-              </button>
+              </div>
             ))}
           </div>
         </>
@@ -102,16 +141,19 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
           </div>
           <div className="slide-list">
             {song.slides.map((slide, index) => (
-              <button
+              <div
                 key={slide.id}
-                type="button"
                 className={`slide-list-item ${index === currentSlide ? "active" : ""}`}
+                role="button"
+                tabIndex={0}
                 onClick={() => onJumpToSlide?.(index)}
+                onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onJumpToSlide?.(index); }}
               >
                 <span className="slide-list-number">{index + 1}</span>
-                <span className="slide-list-text" style={{ textAlign: slide.textStyle?.align ?? "center" }}>{slide.text}</span>
+                {editingIndex === index ? editControls(slide, index) : <span className="slide-list-text" style={{ textAlign: slide.textStyle?.align ?? "center" }}>{slide.text}</span>}
+                {onUpdateSlide && editingIndex !== index && editControls(slide, index)}
                 {alignmentButtons(slide, index)}
-              </button>
+              </div>
             ))}
           </div>
         </div>
