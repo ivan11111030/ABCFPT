@@ -34,6 +34,8 @@ function MobileCameraInner() {
   const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
   const [resolution, setResolution] = useState(initialResolution === "1080p" ? "1080p" : "720p");
   const [audioEnabled, setAudioEnabled] = useState(false);
+  const [audioState, setAudioState] = useState<"off" | "ready" | "live">("off");
+  const [audioLevel, setAudioLevel] = useState(0);
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [signalStrength, setSignalStrength] = useState("good");
   const [errorMessage, setErrorMessage] = useState("");
@@ -41,6 +43,9 @@ function MobileCameraInner() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioAnalyserRef = useRef<AnalyserNode | null>(null);
+  const audioFrameRef = useRef<number>(0);
   const snapshotIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const webrtcTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [streamMode, setStreamMode] = useState<"webrtc" | "snapshot" | "none">("none");
@@ -63,6 +68,40 @@ function MobileCameraInner() {
       clearInterval(snapshotIntervalRef.current);
       snapshotIntervalRef.current = null;
     }
+  };
+
+  const stopAudioMonitor = () => {
+    cancelAnimationFrame(audioFrameRef.current);
+    audioContextRef.current?.close().catch(() => {});
+    audioContextRef.current = null;
+    audioAnalyserRef.current = null;
+    setAudioLevel(0);
+  };
+
+  const startAudioMonitor = (stream: MediaStream) => {
+    stopAudioMonitor();
+    const audioTrack = stream.getAudioTracks()[0];
+    if (!audioTrack) {
+      setAudioState("off");
+      return;
+    }
+
+    const context = new AudioContext();
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 256;
+    context.createMediaStreamSource(stream).connect(analyser);
+    audioContextRef.current = context;
+    audioAnalyserRef.current = analyser;
+    setAudioState("ready");
+
+    const updateLevel = () => {
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteFrequencyData(data);
+      const level = data.reduce((sum, value) => sum + value, 0) / data.length / 255;
+      setAudioLevel(level);
+      audioFrameRef.current = requestAnimationFrame(updateLevel);
+    };
+    audioFrameRef.current = requestAnimationFrame(updateLevel);
   };
 
   const startSnapshotMode = () => {
@@ -149,6 +188,7 @@ function MobileCameraInner() {
     return () => {
       closePeerConnection();
       stopSnapshotMode();
+      stopAudioMonitor();
       removeCameraFromControl();
       socket.off("connect");
       socket.off("disconnect");
@@ -161,6 +201,7 @@ function MobileCameraInner() {
     const cleanup = () => {
       closePeerConnection();
       stopSnapshotMode();
+      stopAudioMonitor();
       removeCameraFromControl();
     };
 
@@ -187,6 +228,7 @@ function MobileCameraInner() {
       });
 
       streamRef.current = stream;
+      startAudioMonitor(stream);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
@@ -212,6 +254,7 @@ function MobileCameraInner() {
     } catch (error) {
       console.error(error);
       setStreamState("error");
+      setAudioState("off");
       setErrorMessage("Camera permission was denied or the selected camera mode is unavailable.");
     }
   };
@@ -221,6 +264,7 @@ function MobileCameraInner() {
     if (webrtcTimeoutRef.current) { clearTimeout(webrtcTimeoutRef.current); webrtcTimeoutRef.current = null; }
     stopSnapshotMode();
     closePeerConnection();
+    stopAudioMonitor();
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     if (videoRef.current) {
@@ -229,6 +273,7 @@ function MobileCameraInner() {
     setCameraEnabled(false);
     setStreamState("idle");
     setStreamMode("none");
+    setAudioState("off");
     setErrorMessage("");
     removeCameraFromControl();
   };
@@ -262,6 +307,7 @@ function MobileCameraInner() {
         stopSnapshotMode();
         setStreamMode("webrtc");
         setStreamState("streaming");
+        setAudioState(streamRef.current?.getAudioTracks().length ? "live" : "off");
         setSignalStrength("good");
         setErrorMessage("");
       } else if (state === "connecting") {
@@ -368,6 +414,10 @@ function MobileCameraInner() {
         <div className="mobile-preview-overlay">
           <span>{streamStateLabel}</span>
           <span className={`signal signal-${signalStrength}`}>● {signalLabel}</span>
+          <span className={`mobile-audio-status ${audioState}`}>
+            {audioState === "off" ? "Mic off" : audioState === "live" ? "Mic live" : "Mic ready"}
+            {audioState !== "off" && <i style={{ width: `${Math.max(4, audioLevel * 100)}%` }} />}
+          </span>
         </div>
       </section>
 
@@ -383,7 +433,7 @@ function MobileCameraInner() {
           </button>
           <label style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--muted)" }}>
             Audio
-            <input type="checkbox" checked={audioEnabled} onChange={() => setAudioEnabled((c) => !c)} />
+            <input type="checkbox" checked={audioEnabled} disabled={cameraEnabled} onChange={() => setAudioEnabled((c) => !c)} />
           </label>
         </div>
 

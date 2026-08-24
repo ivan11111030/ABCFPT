@@ -73,6 +73,7 @@ export default function ControlPage() {
   const [leftWidth, setLeftWidth] = useState(280);
   const [rightWidth, setRightWidth] = useState(320);
   const [showRightPanel, setShowRightPanel] = useState(true);
+  const [combinedCameras, setCombinedCameras] = useState(false);
   const [localStreams, setLocalStreams] = useState<Record<string, MediaStream>>({});
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   const [snapshotFrames, setSnapshotFrames] = useState<Record<string, string>>({});
@@ -480,6 +481,10 @@ export default function ControlPage() {
   };
 
   const streamByCamera = useMemo(() => ({ ...remoteStreams, ...localStreams }), [localStreams, remoteStreams]);
+  const combinedCameraIds = useMemo(() => {
+    const ids = [activeCamera.id, previewCamera.id].filter((id, index, all) => id && all.indexOf(id) === index);
+    return ids.length > 1 ? ids : cameras.slice(0, 2).map((camera) => camera.id);
+  }, [activeCamera.id, cameras, previewCamera.id]);
 
   useEffect(() => {
     const stream = streamByCamera[activeCameraId];
@@ -848,7 +853,19 @@ export default function ControlPage() {
             <div className={`program-box${programFlash ? " flash" : ""}`}>
               <span className="box-label">Program (Live)</span>
               <div className="box-content">
-                {streamByCamera[activeCamera?.id] ? (
+                {combinedCameras && combinedCameraIds.length > 1 ? (
+                  <div className="combined-camera-view">
+                    {combinedCameraIds.map((cameraId) => (
+                      streamByCamera[cameraId] ? (
+                        <video key={cameraId} autoPlay muted playsInline className="program-video" ref={(node) => { if (node) node.srcObject = streamByCamera[cameraId]; }} />
+                      ) : snapshotFrames[cameraId] ? (
+                        <img key={cameraId} src={snapshotFrames[cameraId]} alt={cameras.find((camera) => camera.id === cameraId)?.name || "Camera"} className="program-video" />
+                      ) : (
+                        <div key={cameraId} className="combined-camera-empty">Camera unavailable</div>
+                      )
+                    ))}
+                  </div>
+                ) : streamByCamera[activeCamera?.id] ? (
                   <>
                     <video ref={programVideoRef} autoPlay muted playsInline className="program-video" />
                     {canvaOverlayImage && (
@@ -956,6 +973,9 @@ export default function ControlPage() {
               onHoverCamera={(id) => id && setPreviewCameraId(id)}
               onToggleFullScreen={() => toggleFullScreen("camera")}
               isFullScreen={isCameraFullScreen}
+              streams={streamByCamera}
+              combined={combinedCameras}
+              onToggleCombined={() => setCombinedCameras((current) => !current)}
             />
           )}
           <CameraTransitionPanel transition={cameraTransition} onChangeTransition={changeTransition} />
@@ -1079,6 +1099,9 @@ export default function ControlPage() {
                 onHoverCamera={(id) => id && setPreviewCameraId(id)}
                 onToggleFullScreen={() => toggleFullScreen("camera")}
                 isFullScreen
+                streams={streamByCamera}
+                combined={combinedCameras}
+                onToggleCombined={() => setCombinedCameras((current) => !current)}
               />
             )}
           </div>

@@ -11,9 +11,12 @@ type CameraPreviewPanelProps = {
   onSelectCamera: (cameraId: string) => void;
   onHoverCamera?: (cameraId: string) => void;
   onRemoveCamera?: (cameraId: string) => void;
+  streams?: Record<string, MediaStream>;
+  combined?: boolean;
+  onToggleCombined?: () => void;
 };
 
-export function CameraPreviewPanel({ cameras, activeCameraId, programCameraId, overlayEnabled, onToggleOverlay, onToggleFullScreen, isFullScreen, onSelectCamera, onHoverCamera, onRemoveCamera }: CameraPreviewPanelProps) {
+export function CameraPreviewPanel({ cameras, activeCameraId, programCameraId, overlayEnabled, onToggleOverlay, onToggleFullScreen, isFullScreen, onSelectCamera, onHoverCamera, onRemoveCamera, streams, combined, onToggleCombined }: CameraPreviewPanelProps) {
   const getTallyClass = (cameraId: string) => {
     if (programCameraId && cameraId === programCameraId) return "camera-card tally-program";
     if (cameraId === activeCameraId) return "camera-card tally-preview";
@@ -33,6 +36,11 @@ export function CameraPreviewPanel({ cameras, activeCameraId, programCameraId, o
             {isFullScreen ? "Exit Full Screen" : "Full Screen"}
           </button>
         )}
+        {onToggleCombined && cameras.length > 1 && (
+          <button type="button" className={`button outline ${combined ? "active" : ""}`} onClick={onToggleCombined}>
+            {combined ? "Single View" : "Combine Cameras"}
+          </button>
+        )}
       </div>
       <div className="camera-grid">
         {cameras.map((camera) => (
@@ -40,7 +48,6 @@ export function CameraPreviewPanel({ cameras, activeCameraId, programCameraId, o
             key={camera.id}
             className={getTallyClass(camera.id)}
             style={{ position: "relative" }}
-            onMouseEnter={() => onHoverCamera?.(camera.id)}
           >
             {onRemoveCamera && (
               <button
@@ -72,6 +79,7 @@ export function CameraPreviewPanel({ cameras, activeCameraId, programCameraId, o
                   </span>
                   {programCameraId === camera.id && <span className="status" style={{ background: "rgba(239,68,68,0.2)", color: "#fca5a5" }}>PGM</span>}
                   {activeCameraId === camera.id && programCameraId !== camera.id && <span className="status" style={{ background: "rgba(34,197,94,0.15)", color: "#bbf7d0" }}>PVW</span>}
+                  {streams?.[camera.id]?.getAudioTracks().length ? <span className="status audio-present">AUDIO</span> : null}
                   {/* overlay badge removed per user request */}
                 </div>
               </div>
