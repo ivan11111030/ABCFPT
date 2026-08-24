@@ -436,6 +436,13 @@ export default function ControlPage() {
     songStore.updateSong(song);
     socket.emit("song:update", song);
   };
+  const handleUpdateSlide = (index: number, patch: Partial<Song["slides"][number]>) => {
+    if (!activeSong.id) return;
+    handleUpdateSong({
+      ...activeSong,
+      slides: activeSong.slides.map((slide, slideIndex) => slideIndex === index ? { ...slide, ...patch } : slide),
+    });
+  };
   const handleDeleteSong = (songId: string) => {
     songStore.deleteSong(songId);
     socket.emit("song:delete", songId);
@@ -850,7 +857,7 @@ export default function ControlPage() {
                     {overlayEnabled && (
                       <DraggableOverlay position={overlayPos} onPositionChange={handleOverlayDrag} opacity={overlayOpacity} height={overlayHeight}>
                         <div className="overlay-lyrics">
-                          <p>{activeSong.slides[currentSlide]?.text}</p>
+                          <p style={{ textAlign: activeSong.slides[currentSlide]?.textStyle?.align ?? "center" }}>{activeSong.slides[currentSlide]?.text}</p>
                           <span className="overlay-section">{activeSong.slides[currentSlide]?.section}</span>
                         </div>
                       </DraggableOverlay>
@@ -866,7 +873,7 @@ export default function ControlPage() {
                     {overlayEnabled && (
                       <DraggableOverlay position={overlayPos} onPositionChange={handleOverlayDrag} opacity={overlayOpacity} height={overlayHeight}>
                         <div className="overlay-lyrics">
-                          <p>{activeSong.slides[currentSlide]?.text}</p>
+                          <p style={{ textAlign: activeSong.slides[currentSlide]?.textStyle?.align ?? "center" }}>{activeSong.slides[currentSlide]?.text}</p>
                           <span className="overlay-section">{activeSong.slides[currentSlide]?.section}</span>
                         </div>
                       </DraggableOverlay>
@@ -890,7 +897,7 @@ export default function ControlPage() {
                     {overlayEnabled && (
                       <DraggableOverlay position={overlayPos} interactive={false}>
                         <div className="overlay-lyrics">
-                          <p>{activeSong.slides[currentSlide + 1]?.text ?? "End of song"}</p>
+                          <p style={{ textAlign: activeSong.slides[currentSlide + 1]?.textStyle?.align ?? "center" }}>{activeSong.slides[currentSlide + 1]?.text ?? "End of song"}</p>
                           <span className="overlay-section">{previewCamera.name}</span>
                         </div>
                       </DraggableOverlay>
@@ -924,6 +931,7 @@ export default function ControlPage() {
               overlayEnabled={overlayEnabled}
               onToggleOverlay={toggleOverlay}
               onJumpToSlide={jumpToSection}
+              onUpdateSlide={handleUpdateSlide}
               onToggleFullScreen={() => toggleFullScreen("lyrics")}
               isFullScreen={isLyricsFullScreen}
             />
@@ -1055,6 +1063,7 @@ export default function ControlPage() {
                 overlayEnabled={overlayEnabled}
                 onToggleOverlay={toggleOverlay}
                 onJumpToSlide={jumpToSection}
+                onUpdateSlide={handleUpdateSlide}
                 onToggleFullScreen={() => toggleFullScreen("lyrics")}
                 isFullScreen
               />

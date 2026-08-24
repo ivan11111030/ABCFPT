@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { Song } from "@/src/types/production";
+import type { Slide, Song } from "@/src/types/production";
 
 type LyricsPreviewPanelProps = {
   song: Song;
@@ -9,13 +9,34 @@ type LyricsPreviewPanelProps = {
   onToggleFullScreen?: () => void;
   isFullScreen?: boolean;
   onJumpToSlide?: (index: number) => void;
+  onUpdateSlide?: (index: number, patch: Partial<Slide>) => void;
 };
 
-export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggleOverlay, onToggleFullScreen, isFullScreen, onJumpToSlide }: LyricsPreviewPanelProps) {
+export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggleOverlay, onToggleFullScreen, isFullScreen, onJumpToSlide, onUpdateSlide }: LyricsPreviewPanelProps) {
   const [thumbnailView, setThumbnailView] = useState(true);
 
   const currentText = song.slides[currentSlide]?.text ?? "";
   const nextText = song.slides[currentSlide + 1]?.text ?? "End of song";
+
+  const alignmentButtons = (slide: Slide, index: number) => (
+    <div className="slide-alignment" role="group" aria-label={`Alignment for slide ${index + 1}`}>
+      {(["left", "center", "right"] as const).map((align) => (
+        <button
+          key={align}
+          type="button"
+          className={slide.textStyle?.align === align || (!slide.textStyle?.align && align === "center") ? "active" : ""}
+          aria-label={`Align slide ${index + 1} ${align}`}
+          aria-pressed={slide.textStyle?.align === align || (!slide.textStyle?.align && align === "center")}
+          onClick={(event) => {
+            event.stopPropagation();
+            onUpdateSlide?.(index, { textStyle: { ...slide.textStyle, align } });
+          }}
+        >
+          {align === "left" ? "L" : align === "center" ? "C" : "R"}
+        </button>
+      ))}
+    </div>
+  );
 
   const thumbnailSlides = useMemo(
     () => song.slides.map((slide, index) => ({ ...slide, label: index + 1 })),
@@ -50,7 +71,7 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
               <span>Current</span>
             </div>
             <div className="slide-preview-body">
-              <p>{currentText}</p>
+              <p style={{ textAlign: song.slides[currentSlide]?.textStyle?.align ?? "center" }}>{currentText}</p>
             </div>
           </div>
 
@@ -63,7 +84,8 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
                 onClick={() => onJumpToSlide?.(index)}
               >
                 <div className="slide-thumbnail-number">{index + 1}</div>
-                <div className="slide-thumbnail-text">{slide.text}</div>
+                <div className="slide-thumbnail-text" style={{ textAlign: slide.textStyle?.align ?? "center" }}>{slide.text}</div>
+                {alignmentButtons(slide, index)}
               </button>
             ))}
           </div>
@@ -72,7 +94,7 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
         <div className="lyrics-list-view">
           <div className="slide-card">
             <div className="slide-label">Current Slide</div>
-            <p className="slide-text">{currentText}</p>
+            <p className="slide-text" style={{ textAlign: song.slides[currentSlide]?.textStyle?.align ?? "center" }}>{currentText}</p>
           </div>
           <div className="next-card">
             <div className="slide-label">Next</div>
@@ -87,7 +109,8 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
                 onClick={() => onJumpToSlide?.(index)}
               >
                 <span className="slide-list-number">{index + 1}</span>
-                <span className="slide-list-text">{slide.text}</span>
+                <span className="slide-list-text" style={{ textAlign: slide.textStyle?.align ?? "center" }}>{slide.text}</span>
+                {alignmentButtons(slide, index)}
               </button>
             ))}
           </div>
