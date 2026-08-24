@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { RefreshCacheBuster } from "@/src/components/RefreshCacheBuster";
 
 export const metadata: Metadata = {
   title: "ABCF Production Team",
@@ -21,6 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="shortcut icon" href={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/logo-left.png`} type="image/png" />
       </head>
       <body>
+        <RefreshCacheBuster />
         {children}
       </body>
     </html>
