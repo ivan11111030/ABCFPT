@@ -432,7 +432,7 @@ h1, h2, h3, p { margin: 0; }
   grid-template-columns: 280px 6px 1fr 6px 320px;
   gap: 0;
   overflow: hidden;
-  height: calc(100vh - 64px - 52px);
+  height: calc(100vh - 64px - 56px);
   border-top: 1px solid rgba(255, 255, 255, 0.04);
 }
 
@@ -454,20 +454,20 @@ h1, h2, h3, p { margin: 0; }
 .control-left,
 .control-center,
 .control-right {
-  background: rgba(15, 23, 42, 0.88);
-  border-radius: 24px;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05), 0 30px 60px rgba(0, 0, 0, 0.16);
+  background: rgba(12, 20, 37, 0.94);
+  border-radius: 16px;
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.08), 0 18px 42px rgba(0, 0, 0, 0.18);
 }
 
 .control-left {
   border-right: 1px solid var(--border);
   overflow-y: auto;
-  padding: var(--sp-2);
+  padding: 14px;
 }
 
 .control-center {
   overflow-y: auto;
-  padding: var(--sp-2);
+  padding: 14px;
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
@@ -476,7 +476,7 @@ h1, h2, h3, p { margin: 0; }
 .control-right {
   border-left: 1px solid var(--border);
   overflow-y: auto;
-  padding: var(--sp-2);
+  padding: 14px;
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
@@ -491,7 +491,7 @@ h1, h2, h3, p { margin: 0; }
   padding: 10px var(--sp-3);
   background: var(--panel);
   border-top: 1px solid var(--border);
-  min-height: 52px;
+  min-height: 56px;
   position: sticky;
   bottom: 0;
   z-index: 20;
@@ -1527,7 +1527,7 @@ h1, h2, h3, p { margin: 0; }
 .studio-panel {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 14px;
   padding: var(--sp-2);
   display: flex;
   flex-direction: column;
@@ -1569,10 +1569,139 @@ h1, h2, h3, p { margin: 0; }
   font-size: var(--font-body);
 }
 
+.studio-input-group select {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text);
+  font-size: var(--font-label);
+}
+
+.studio-input-group input:focus,
+.studio-input-group select:focus {
+  outline: 2px solid rgba(79, 195, 247, 0.22);
+  border-color: var(--accent);
+}
+
 .studio-control-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--sp-1);
+}
+
+/* ========== CONTROL ROOM POLISH ========== */
+.control-left,
+.control-center,
+.control-right {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+}
+
+.control-left::-webkit-scrollbar,
+.control-center::-webkit-scrollbar,
+.control-right::-webkit-scrollbar {
+  width: 7px;
+}
+
+.control-left::-webkit-scrollbar-thumb,
+.control-center::-webkit-scrollbar-thumb,
+.control-right::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+}
+
+.control-right > * {
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+}
+
+.control-right .panel-header,
+.control-right .studio-panel > .panel-header {
+  min-height: 34px;
+}
+
+.control-right .panel-header p {
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+
+.control-right input,
+.control-right select,
+.control-right textarea {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.control-right input:hover,
+.control-right select:hover,
+.control-right textarea:hover {
+  background: rgba(39, 52, 73, 1);
+}
+
+.control-right .button {
+  box-shadow: none;
+}
+
+.control-right .button.primary,
+.control-right .button.success {
+  box-shadow: 0 8px 18px rgba(34, 197, 94, 0.16);
+}
+
+.control-right .button.outline {
+  border-color: rgba(148, 163, 184, 0.22);
+}
+
+.program-box,
+.preview-box {
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.24);
+}
+
+.program-box .box-label,
+.preview-box .box-label {
+  top: 10px;
+  left: 10px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+.control-right > * {
+  min-width: 0;
+  width: 100%;
+}
+
+.studio-panel,
+.scene-panel,
+.camera-panel,
+.audio-panel,
+.mobile-invite-panel,
+.local-camera-panel {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.studio-panel .panel-header,
+.scene-panel .panel-header,
+.camera-panel .panel-header {
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.studio-line {
+  gap: 12px;
+  align-items: baseline;
+}
+
+.studio-line span,
+.studio-line strong {
+  min-width: 0;
+}
+
+.studio-line strong {
+  max-width: 62%;
+  overflow-wrap: anywhere;
+  text-align: right;
 }
 
 /* ========== SLIDE CONTROLS ========== */
