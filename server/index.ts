@@ -254,10 +254,11 @@ function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingPr
       fullUrl,
     ];
 
-    ffmpegProcess = spawn(FFMPEG_PATH, args, { stdio: ["pipe", "pipe", "pipe"] });
+    const process = spawn(FFMPEG_PATH, args, { stdio: ["pipe", "pipe", "pipe"] });
+    ffmpegProcess = process;
     let lastFfmpegError = "";
 
-    ffmpegProcess.stderr?.on("data", (data: Buffer) => {
+    process.stderr?.on("data", (data: Buffer) => {
       const msg = data.toString();
       const meaningfulLines = msg.split(/\r?\n/).filter((line) => line.trim());
       const errorLine = meaningfulLines.find((line) => /error|failed|denied|refused|invalid/i.test(line));
@@ -268,7 +269,8 @@ function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingPr
       }
     });
 
-    ffmpegProcess.on("error", (err) => {
+    process.on("error", (err) => {
+      if (ffmpegProcess !== process) return;
       console.error("[FFmpeg] Process error:", err.message);
       state.isLive = false;
       io.emit("stream:error", { message: `FFmpeg error: ${err.message}` });
@@ -276,7 +278,8 @@ function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingPr
       ffmpegProcess = null;
     });
 
-    ffmpegProcess.on("close", (code) => {
+    process.on("close", (code) => {
+      if (ffmpegProcess !== process) return;
       console.log(`[FFmpeg] Process exited with code ${code}`);
       if (state.isLive) {
         state.isLive = false;
