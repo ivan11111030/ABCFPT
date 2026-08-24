@@ -9,8 +9,8 @@ const nextConfig = {
   },
   env: {
     NEXT_PUBLIC_BASE_PATH: "/ABCFPT",
-    NEXT_PUBLIC_SOCKET_SERVER_URL: process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || process.env.SOCKET_SERVER_URL || "http://localhost:4000",
-    SOCKET_SERVER_URL: process.env.SOCKET_SERVER_URL || "http://localhost:4000",
+    NEXT_PUBLIC_SOCKET_SERVER_URL: process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || process.env.SOCKET_SERVER_URL || (process.env.NODE_ENV === "production" ? "https://abcfpt-socket.onrender.com" : "http://localhost:4000"),
+    SOCKET_SERVER_URL: process.env.SOCKET_SERVER_URL || (process.env.NODE_ENV === "production" ? "https://abcfpt-socket.onrender.com" : "http://localhost:4000"),
   }
 };
 
