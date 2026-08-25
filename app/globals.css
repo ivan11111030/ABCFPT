@@ -486,6 +486,10 @@ h1, h2, h3, p { margin: 0; }
   display: none;
 }
 
+.mobile-dock-header {
+  display: none;
+}
+
 /* ========== BOTTOM CONTROL BAR (Production Dock) ========== */
 .control-bar {
   display: flex;
@@ -2672,17 +2676,33 @@ h1, h2, h3, p { margin: 0; }
 
   .control-right.mobile-production-dock {
     position: fixed;
-    inset: 0 0 56px auto;
+    inset: 0 0 56px 0;
     z-index: 40;
-    width: min(390px, calc(100vw - 12px));
+    width: 100%;
     max-width: 100%;
     min-width: 0;
     border: 1px solid rgba(148, 163, 184, 0.22);
-    border-right: 0;
-    border-radius: 14px 0 0 14px;
+    border-radius: 0;
     padding: 12px;
     background: #111c31;
     box-shadow: -18px 0 50px rgba(0, 0, 0, 0.4);
+  }
+
+  .mobile-dock-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 42px;
+    padding: 0 2px 10px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+    color: var(--text);
+  }
+
+  .mobile-dock-header .button {
+    min-height: 34px;
+    padding: 7px 12px;
+    font-size: 12px;
   }
 
   .control-right.mobile-production-dock > * {

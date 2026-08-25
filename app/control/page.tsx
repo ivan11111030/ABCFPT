@@ -968,6 +968,12 @@ export default function ControlPage() {
           onClick={() => setShowRightPanel(false)}
         />
         <div className="control-right mobile-production-dock">
+          <div className="mobile-dock-header">
+            <strong>Production Controls</strong>
+            <button type="button" className="button subtle" onClick={() => setShowRightPanel(false)}>
+              Close
+            </button>
+          </div>
           {!isCameraFullScreen && (
             <CameraPreviewPanel
               cameras={cameras}
