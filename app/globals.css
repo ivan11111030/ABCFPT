@@ -2686,6 +2686,7 @@ h1, h2, h3, p { margin: 0; }
     padding: 12px;
     background: #111c31;
     box-shadow: -18px 0 50px rgba(0, 0, 0, 0.4);
+    overflow-x: hidden;
   }
 
   .mobile-dock-header {
@@ -2707,6 +2708,32 @@ h1, h2, h3, p { margin: 0; }
 
   .control-right.mobile-production-dock > * {
     min-width: 0;
+    max-width: 100%;
+  }
+
+  .control-right.mobile-production-dock .panel-header,
+  .control-right.mobile-production-dock .display-connect-actions,
+  .control-right.mobile-production-dock .control-row,
+  .control-right.mobile-production-dock .studio-line {
+    min-width: 0;
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .control-right.mobile-production-dock .panel-header p,
+  .control-right.mobile-production-dock .panel-title,
+  .control-right.mobile-production-dock label,
+  .control-right.mobile-production-dock strong,
+  .control-right.mobile-production-dock span {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .control-right.mobile-production-dock .button {
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
   }
 
   .control-right.mobile-production-dock input,
