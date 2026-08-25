@@ -960,7 +960,14 @@ export default function ControlPage() {
 
         {/* RIGHT: PRODUCTION CONTROLS */}
         {showRightPanel && (
-        <div className="control-right">
+        <>
+        <button
+          type="button"
+          className="control-mobile-backdrop"
+          aria-label="Close production controls"
+          onClick={() => setShowRightPanel(false)}
+        />
+        <div className="control-right mobile-production-dock">
           {!isCameraFullScreen && (
             <CameraPreviewPanel
               cameras={cameras}
@@ -1054,6 +1061,7 @@ export default function ControlPage() {
           </section>
           <SyncStatusBadge status={connected ? "connected" : "disconnected"} />
         </div>
+        </>
         )}
       </div>
 

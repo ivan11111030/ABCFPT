@@ -482,6 +482,10 @@ h1, h2, h3, p { margin: 0; }
   gap: var(--sp-2);
 }
 
+.control-mobile-backdrop {
+  display: none;
+}
+
 /* ========== BOTTOM CONTROL BAR (Production Dock) ========== */
 .control-bar {
   display: flex;
@@ -2622,6 +2626,92 @@ h1, h2, h3, p { margin: 0; }
 
   .resize-handle {
     display: none;
+  }
+
+  .control-shell {
+    min-height: 100dvh;
+  }
+
+  .control-body {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: visible;
+    height: auto;
+    padding-bottom: 72px;
+  }
+
+  .control-left,
+  .control-center {
+    width: 100%;
+    min-width: 0;
+    border-radius: 0;
+  }
+
+  .control-left {
+    order: 2;
+  }
+
+  .control-center {
+    order: 1;
+  }
+
+  .control-mobile-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    width: 100%;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: rgba(2, 6, 23, 0.68);
+    cursor: pointer;
+  }
+
+  .control-right.mobile-production-dock {
+    position: fixed;
+    inset: 0 0 56px auto;
+    z-index: 40;
+    width: min(390px, calc(100vw - 12px));
+    max-width: 100%;
+    min-width: 0;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-right: 0;
+    border-radius: 14px 0 0 14px;
+    padding: 12px;
+    background: #111c31;
+    box-shadow: -18px 0 50px rgba(0, 0, 0, 0.4);
+  }
+
+  .control-right.mobile-production-dock > * {
+    min-width: 0;
+  }
+
+  .control-right.mobile-production-dock input,
+  .control-right.mobile-production-dock select,
+  .control-right.mobile-production-dock textarea {
+    max-width: 100%;
+  }
+
+  .control-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 50;
+    min-height: 56px;
+    overflow-x: auto;
+    justify-content: flex-start;
+    padding: 8px 12px;
+  }
+
+  .control-bar .button {
+    flex: 0 0 auto;
+    min-height: 40px;
+    padding: 8px 12px;
+    font-size: 12px;
   }
 
   .control-left,
