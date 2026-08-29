@@ -8,6 +8,7 @@ type CameraPreviewPanelProps = {
   onToggleOverlay: () => void;
   onToggleFullScreen?: () => void;
   isFullScreen?: boolean;
+  onOpenCameraModal?: () => void;
   onSelectCamera: (cameraId: string) => void;
   onHoverCamera?: (cameraId: string) => void;
   onRemoveCamera?: (cameraId: string) => void;
@@ -16,7 +17,7 @@ type CameraPreviewPanelProps = {
   onToggleCombined?: () => void;
 };
 
-export function CameraPreviewPanel({ cameras, activeCameraId, programCameraId, overlayEnabled, onToggleOverlay, onToggleFullScreen, isFullScreen, onSelectCamera, onHoverCamera, onRemoveCamera, streams, combined, onToggleCombined }: CameraPreviewPanelProps) {
+export function CameraPreviewPanel({ cameras, activeCameraId, programCameraId, overlayEnabled, onToggleOverlay, onToggleFullScreen, isFullScreen, onOpenCameraModal, onSelectCamera, onHoverCamera, onRemoveCamera, streams, combined, onToggleCombined }: CameraPreviewPanelProps) {
   const getTallyClass = (cameraId: string) => {
     if (programCameraId && cameraId === programCameraId) return "camera-card tally-program";
     if (cameraId === activeCameraId) return "camera-card tally-preview";
@@ -30,17 +31,24 @@ export function CameraPreviewPanel({ cameras, activeCameraId, programCameraId, o
           <p>Cameras</p>
           <span className="muted" style={{ fontSize: 12, color: "var(--muted)" }}>{cameras.filter((c) => c.status === "online").length}/{cameras.length} online</span>
         </div>
-        {/* overlay toggle removed per user request */}
-        {onToggleFullScreen && (
-          <button type="button" className={`button outline ${isFullScreen ? "active" : ""}`} onClick={onToggleFullScreen}>
-            {isFullScreen ? "Exit Full Screen" : "Full Screen"}
-          </button>
-        )}
-        {onToggleCombined && cameras.length > 1 && (
-          <button type="button" className={`button outline ${combined ? "active" : ""}`} onClick={onToggleCombined}>
-            {combined ? "Single View" : "Combine Cameras"}
-          </button>
-        )}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {onOpenCameraModal && (
+            <button type="button" className="button outline" onClick={onOpenCameraModal}>
+              Add Camera
+            </button>
+          )}
+          {/* overlay toggle removed per user request */}
+          {onToggleFullScreen && (
+            <button type="button" className={`button outline ${isFullScreen ? "active" : ""}`} onClick={onToggleFullScreen}>
+              {isFullScreen ? "Exit Full Screen" : "Full Screen"}
+            </button>
+          )}
+          {onToggleCombined && cameras.length > 1 && (
+            <button type="button" className={`button outline ${combined ? "active" : ""}`} onClick={onToggleCombined}>
+              {combined ? "Single View" : "Combine Cameras"}
+            </button>
+          )}
+        </div>
       </div>
       <div className="camera-grid">
         {cameras.map((camera) => (

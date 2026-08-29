@@ -52,6 +52,7 @@ export default function ControlPage() {
   const [activeSceneConfig, setActiveSceneConfig] = useState<SceneConfig>(DEFAULT_SCENE_CONFIGS.worship);
   const [showSceneEditor, setShowSceneEditor] = useState(false);
   const [showSceneLibrary, setShowSceneLibrary] = useState(false);
+  const [showCameraModal, setShowCameraModal] = useState(false);
   const [editingScene, setEditingScene] = useState<SceneTemplate | null>(null);
   const [activeCameraId, setActiveCameraId] = useState<string>("");
   const [previewCameraId, setPreviewCameraId] = useState<string>("");
@@ -984,6 +985,7 @@ export default function ControlPage() {
               onSelectCamera={selectCamera}
               onRemoveCamera={handleRemoveCamera}
               onHoverCamera={(id) => id && setPreviewCameraId(id)}
+              onOpenCameraModal={() => setShowCameraModal(true)}
               onToggleFullScreen={() => toggleFullScreen("camera")}
               isFullScreen={isCameraFullScreen}
               streams={streamByCamera}
@@ -1125,6 +1127,32 @@ export default function ControlPage() {
           Scene: {activeSceneType}
         </button>
       </div>
+
+      {/* CAMERA MODAL */}
+      {showCameraModal && (
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowCameraModal(false); }}>
+          <div className="modal-content modal-wide">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h2 style={{ margin: 0, fontSize: 18 }}>Camera Manager</h2>
+              <button type="button" className="button subtle" onClick={() => setShowCameraModal(false)}>✕ Close</button>
+            </div>
+            <div style={{ display: "grid", gap: 16 }}>
+              <CameraDiscoveryPanel
+                onAddCamera={(camera) => {
+                  handleAddCamera(camera);
+                  setShowCameraModal(false);
+                }}
+              />
+              <LocalCameraPanel
+                onAddCamera={(camera, stream) => {
+                  handleAddCamera(camera, stream);
+                  setShowCameraModal(false);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* SONG MANAGER MODAL */}
       {showSongManager && (
