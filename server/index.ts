@@ -261,7 +261,7 @@ function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingPr
     process.stderr?.on("data", (data: Buffer) => {
       const msg = data.toString();
       const meaningfulLines = msg.split(/\r?\n/).filter((line) => line.trim());
-      const errorLine = meaningfulLines.find((line) => /error|failed|denied|refused|invalid/i.test(line));
+      const errorLine = meaningfulLines.find((line) => /error|failed|denied|refused|invalid|unauthorized|forbidden|fatal/i.test(line));
       if (errorLine) lastFfmpegError = errorLine.trim();
       // Only log meaningful lines (skip progress spam)
       if (msg.includes("Error") || msg.includes("error") || msg.includes("failed") || msg.includes("Opening") || msg.includes("Output")) {

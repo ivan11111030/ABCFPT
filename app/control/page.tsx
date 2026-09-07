@@ -577,7 +577,13 @@ export default function ControlPage() {
         }
 
         setStreamStatus("Starting encoder...");
-        startRecording();
+        try {
+          startRecording();
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Unable to start browser recorder";
+          setStreamStatus(`Error: ${message}`);
+          socket.emit("stream:stop");
+        }
       }
     );
   };
@@ -674,6 +680,14 @@ export default function ControlPage() {
     };
     drawFrame();
 
+    if (!canvas.captureStream) {
+      throw new Error("This browser does not support canvas streaming");
+    }
+
+    if (typeof MediaRecorder === "undefined") {
+      throw new Error("This browser does not support live recording");
+    }
+
     // Capture the canvas as a media stream
     const canvasStream = canvas.captureStream(30);
 
@@ -693,10 +707,7 @@ export default function ControlPage() {
         ? "video/webm;codecs=vp8"
         : "video/webm";
 
-    const recorder = new MediaRecorder(canvasStream, {
-      mimeType,
-      videoBitsPerSecond: 2_500_000,
-    });
+    const recorder = new MediaRecorder(canvasStream, { mimeType, videoBitsPerSecond: 2_500_000 });
 
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
@@ -711,9 +722,14 @@ export default function ControlPage() {
       stopStream();
     };
 
+    recorder.onstop = () => {
+      canvasStream.getTracks().forEach((track) => track.stop());
+    };
+
     // Send a chunk every 250ms for low latency
     recorder.start(250);
     mediaRecorderRef.current = recorder;
+    setStreamStatus("Live");
   };
 
   const stopStream = () => {
