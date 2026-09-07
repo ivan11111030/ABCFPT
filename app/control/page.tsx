@@ -62,6 +62,7 @@ export default function ControlPage() {
   const [connected, setConnected] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [previewSlideIndex, setPreviewSlideIndex] = useState(0);
+  const [programPreviewHeight, setProgramPreviewHeight] = useState(280);
   const [rtmpUrl, setRtmpUrl] = useState("rtmps://live-api-s.facebook.com:443/rtmp/");
   const [streamKey, setStreamKey] = useState("");
   const [encodingProfile, setEncodingProfile] = useState<"low" | "medium" | "high" | "ultra">("medium");
@@ -1006,7 +1007,7 @@ export default function ControlPage() {
         <div className="control-center">
           <div className="program-preview-stack">
             {/* PROGRAM (LIVE) */}
-            <div className={`program-box${programFlash ? " flash" : ""}`}>
+            <div className={`program-box${programFlash ? " flash" : ""}`} style={{ height: `${programPreviewHeight}px` }}>
               <span className="box-label">Program (Live)</span>
               <div className="box-content">
                 {externalPresentationStream ? (
@@ -1077,7 +1078,7 @@ export default function ControlPage() {
             </div>
 
             {/* PREVIEW (Next) */}
-            <div className="preview-box">
+            <div className="preview-box" style={{ height: `${programPreviewHeight}px` }}>
               <span className="box-label">Preview</span>
               <div className="box-content">
                 {externalPresentationStream ? (
@@ -1112,6 +1113,20 @@ export default function ControlPage() {
                   </div>
                 )}
               </div>
+            </div>
+
+            <div className="program-preview-size-control">
+              <label htmlFor="program-preview-height">Preview height</label>
+              <input
+                id="program-preview-height"
+                type="range"
+                min="180"
+                max="620"
+                step="10"
+                value={programPreviewHeight}
+                onChange={(event) => setProgramPreviewHeight(Number(event.target.value))}
+              />
+              <output htmlFor="program-preview-height">{programPreviewHeight}px</output>
             </div>
 
             {/* TAKE button */}
