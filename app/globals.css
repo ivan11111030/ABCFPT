@@ -1098,6 +1098,8 @@ h1, h2, h3, p { margin: 0; }
   border-radius: 12px;
   overflow: hidden;
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 @media (max-width: 760px) {
@@ -1164,7 +1166,8 @@ h1, h2, h3, p { margin: 0; }
   position: relative;
   display: grid;
   place-items: center;
-  min-height: inherit;
+  flex: 1;
+  min-height: 0;
   padding: var(--sp-3);
   text-align: center;
 }
