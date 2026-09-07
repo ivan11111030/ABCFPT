@@ -622,7 +622,7 @@ export default function ControlPage() {
       canvas.height = HEIGHT;
       streamCanvasRef.current = canvas;
     }
-    const ctx = canvas.getContext("2d")!;
+    const ctx = canvas.getContext("2d", { alpha: false })!;
 
     // Get the camera source video element
     const srcVideo = programVideoRef.current;
@@ -736,7 +736,8 @@ export default function ControlPage() {
     }
 
     // Record and send chunks to server
-    const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+    const hasAudio = canvasStream.getAudioTracks().length > 0;
+    const mimeType = hasAudio && MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
       ? "video/webm;codecs=vp8,opus"
       : MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
         ? "video/webm;codecs=vp8"
