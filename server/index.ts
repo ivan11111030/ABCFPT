@@ -233,11 +233,14 @@ function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingPr
   try {
     const args = [
       "-f", "webm",           // input format from MediaRecorder
+      "-fflags", "+genpts",
       "-i", "pipe:0",         // read from stdin
       // Video encoding
+      "-map", "0:v:0",
       "-c:v", "libx264",
       "-preset", "veryfast",
       "-tune", "zerolatency",
+      "-threads", "1",
       "-b:v", profile.videoBitrate,
       "-maxrate", profile.videoBitrate,
       "-bufsize", profile.bufsize,
@@ -245,6 +248,7 @@ function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingPr
       "-g", String(Number(profile.fps) * 2), // keyframe every 2s
       "-r", profile.fps,
       // Audio encoding
+      "-map", "0:a:0?",
       "-c:a", "aac",
       "-b:a", profile.audioBitrate,
       "-ar", "44100",
@@ -256,13 +260,13 @@ function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingPr
 
     const process = spawn(FFMPEG_PATH, args, { stdio: ["pipe", "pipe", "pipe"] });
     ffmpegProcess = process;
-    let lastFfmpegError = "";
+    const ffmpegLog: string[] = [];
 
     process.stderr?.on("data", (data: Buffer) => {
       const msg = data.toString();
-      const meaningfulLines = msg.split(/\r?\n/).filter((line) => line.trim());
-      const errorLine = meaningfulLines.find((line) => /error|failed|denied|refused|invalid|unauthorized|forbidden|fatal/i.test(line));
-      if (errorLine) lastFfmpegError = errorLine.trim();
+      const meaningfulLines = msg.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      ffmpegLog.push(...meaningfulLines);
+      if (ffmpegLog.length > 20) ffmpegLog.splice(0, ffmpegLog.length - 20);
       // Only log meaningful lines (skip progress spam)
       if (msg.includes("Error") || msg.includes("error") || msg.includes("failed") || msg.includes("Opening") || msg.includes("Output")) {
         console.log(`[FFmpeg] ${msg.trim()}`);
@@ -282,12 +286,13 @@ function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingPr
       if (ffmpegProcess !== process) return;
       const exitReason = code === null ? `signal ${signal || "unknown"}` : `code ${code}`;
       console.log(`[FFmpeg] Process exited with ${exitReason}`);
+      const diagnostic = [...ffmpegLog].reverse().find((line) => /error|failed|denied|refused|invalid|unauthorized|forbidden|fatal/i.test(line)) || ffmpegLog[ffmpegLog.length - 1];
       if (state.isLive) {
         state.isLive = false;
         if (code !== 0) {
-          io.emit("stream:error", { message: lastFfmpegError || `Stream ended unexpectedly (${exitReason})` });
+          io.emit("stream:error", { message: diagnostic || `Stream ended unexpectedly (${exitReason})` });
         }
-        io.emit("stream:stopped", { status: "stopped", reason: lastFfmpegError || `Stream ended unexpectedly (${exitReason})` });
+        io.emit("stream:stopped", { status: "stopped", reason: diagnostic || `Stream ended unexpectedly (${exitReason})` });
       }
       ffmpegProcess = null;
     });
