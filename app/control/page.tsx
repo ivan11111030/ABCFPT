@@ -757,6 +757,8 @@ export default function ControlPage() {
   const triggerSlide = (direction: "previous" | "next") => {
     const next = Math.max(0, Math.min(activeSong.slides.length - 1, direction === "next" ? safePreviewSlideIndex + 1 : safePreviewSlideIndex - 1));
     setPreviewSlideIndex(next);
+    setCurrentSlide(next);
+    socket.emit("control:slide", next);
   };
 
   const jumpToSection = (index: number) => {
@@ -919,7 +921,25 @@ export default function ControlPage() {
       </section>
 
       {/* 3-PANEL BODY */}
-      <div className="control-body" style={{ gridTemplateColumns: `${showLeftPanel ? `${leftWidth}px 6px` : ""} 1fr${showRightPanel ? ` 6px ${rightWidth}px` : ""}` }}>
+      <div className={`control-body${!showLeftPanel ? " left-panel-hidden" : ""}${!showRightPanel ? " right-panel-hidden" : ""}`} style={{ gridTemplateColumns: `${showLeftPanel ? `${leftWidth}px 6px` : ""} 1fr${showRightPanel ? ` 6px ${rightWidth}px` : ""}` }}>
+        <button
+          type="button"
+          className={`panel-edge-toggle panel-edge-toggle-left${showLeftPanel ? " panel-edge-toggle-open" : ""}`}
+          onClick={() => setShowLeftPanel((current) => !current)}
+          aria-label={showLeftPanel ? "Hide setlist panel" : "Show setlist panel"}
+          title={showLeftPanel ? "Hide setlist" : "Show setlist"}
+        >
+          {showLeftPanel ? "◀" : "▶"}
+        </button>
+        <button
+          type="button"
+          className={`panel-edge-toggle panel-edge-toggle-right${showRightPanel ? " panel-edge-toggle-open" : ""}`}
+          onClick={() => setShowRightPanel((current) => !current)}
+          aria-label={showRightPanel ? "Hide production controls" : "Show production controls"}
+          title={showRightPanel ? "Hide production controls" : "Show production controls"}
+        >
+          {showRightPanel ? "▶" : "◀"}
+        </button>
         {/* LEFT: SETLIST */}
         {showLeftPanel && <div className="control-left">
           <SetlistPanel songs={songs} activeSongId={activeSongId} onSelectSong={selectSong} onReorder={handleReorderSong} />

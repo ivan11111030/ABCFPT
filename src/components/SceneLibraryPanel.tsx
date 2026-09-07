@@ -30,6 +30,7 @@ export function SceneLibraryPanel({ onLoadScene, onEditScene, onClose }: SceneLi
   const [renameValue, setRenameValue] = useState("");
   const [newSceneType, setNewSceneType] = useState<SceneType | null>(null);
   const [newSceneName, setNewSceneName] = useState("");
+  const [newSceneMessage, setNewSceneMessage] = useState("");
 
   useEffect(() => {
     return sceneStore.subscribe(() => setScenes([...sceneStore.getScenes()]));
@@ -77,11 +78,16 @@ export function SceneLibraryPanel({ onLoadScene, onEditScene, onClose }: SceneLi
   };
 
   const handleNewScene = () => {
-    if (!newSceneType || !newSceneName.trim()) return;
-    const template = createSceneTemplate(newSceneName.trim(), newSceneType);
+    if (!newSceneType) return;
+    const typeLabel = TYPE_LABELS[newSceneType].replace(/^\S+\s*/, "");
+    const enteredName = newSceneName.trim();
+    const nextNumber = sceneStore.getScenesByType(newSceneType).length + 1;
+    const template = createSceneTemplate(enteredName || `${typeLabel} Scene ${nextNumber}`, newSceneType);
     sceneStore.addScene(template);
+    setNewSceneMessage(`Added ${template.name}`);
     setNewSceneType(null);
     setNewSceneName("");
+    window.setTimeout(() => setNewSceneMessage(""), 2400);
   };
 
   const handleRestoreVersion = (sceneId: string, version: SceneVersion) => {
@@ -156,6 +162,7 @@ export function SceneLibraryPanel({ onLoadScene, onEditScene, onClose }: SceneLi
             <button type="button" className="button subtle" style={{ fontSize: 10, padding: "4px 6px" }} onClick={() => setNewSceneType(null)}>✕</button>
           </div>
         )}
+        {newSceneMessage && <p className="scene-action-message" role="status">{newSceneMessage}</p>}
       </div>
 
       {/* Grouped scene list */}
