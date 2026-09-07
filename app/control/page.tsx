@@ -102,6 +102,8 @@ export default function ControlPage() {
   const programVideoRef = useRef<HTMLVideoElement>(null);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
   const externalPresentationVideoRef = useRef<HTMLVideoElement>(null);
+  const externalProgramVideoRef = useRef<HTMLVideoElement>(null);
+  const externalPreviewVideoRef = useRef<HTMLVideoElement>(null);
   const streamCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const animFrameRef = useRef<number>(0);
@@ -543,6 +545,12 @@ export default function ControlPage() {
   useEffect(() => {
     if (externalPresentationVideoRef.current) {
       externalPresentationVideoRef.current.srcObject = externalPresentationStream;
+    }
+    if (externalProgramVideoRef.current) {
+      externalProgramVideoRef.current.srcObject = externalPresentationStream;
+    }
+    if (externalPreviewVideoRef.current) {
+      externalPreviewVideoRef.current.srcObject = externalPresentationStream;
     }
   }, [externalPresentationStream]);
 
@@ -1001,7 +1009,23 @@ export default function ControlPage() {
             <div className={`program-box${programFlash ? " flash" : ""}`}>
               <span className="box-label">Program (Live)</span>
               <div className="box-content">
-                {combinedCameras && combinedCameraIds.length > 1 ? (
+                {externalPresentationStream ? (
+                  <div className="external-program-preview">
+                    <video ref={externalProgramVideoRef} autoPlay muted playsInline className="program-video external-presentation-visible" />
+                    {externalPresentationMode === "camera-overlay" && streamByCamera[activeCamera?.id] && (
+                      <video autoPlay muted playsInline className="external-camera-pip" ref={(node) => { if (node) node.srcObject = streamByCamera[activeCamera.id]; }} />
+                    )}
+                    <span className="external-source-label">POWERPOINT {externalPresentationMode === "camera-overlay" ? "+ CAMERA" : ""}</span>
+                    {overlayEnabled && (
+                      <DraggableOverlay position={overlayPos} onPositionChange={handleOverlayDrag} opacity={overlayOpacity} height={overlayHeight}>
+                        <div className="overlay-lyrics">
+                          <p style={{ textAlign: activeSong.slides[currentSlide]?.textStyle?.align ?? "center" }}>{activeSong.slides[currentSlide]?.text}</p>
+                          <span className="overlay-section">{activeSong.slides[currentSlide]?.section}</span>
+                        </div>
+                      </DraggableOverlay>
+                    )}
+                  </div>
+                ) : combinedCameras && combinedCameraIds.length > 1 ? (
                   <div className="combined-camera-view">
                     {combinedCameraIds.map((cameraId) => (
                       streamByCamera[cameraId] ? (
@@ -1056,7 +1080,15 @@ export default function ControlPage() {
             <div className="preview-box">
               <span className="box-label">Preview</span>
               <div className="box-content">
-                {streamByCamera[previewCamera?.id] ? (
+                {externalPresentationStream ? (
+                  <div className="external-program-preview">
+                    <video ref={externalPreviewVideoRef} autoPlay muted playsInline className="preview-video external-presentation-visible" />
+                    {externalPresentationMode === "camera-overlay" && streamByCamera[previewCamera?.id] && (
+                      <video autoPlay muted playsInline className="external-camera-pip" ref={(node) => { if (node) node.srcObject = streamByCamera[previewCamera.id]; }} />
+                    )}
+                    <span className="external-source-label">POWERPOINT PREVIEW</span>
+                  </div>
+                ) : streamByCamera[previewCamera?.id] ? (
                   <>
                     <video ref={previewVideoRef} autoPlay muted playsInline className="preview-video" />
                     {overlayEnabled && (
