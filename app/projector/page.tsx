@@ -253,6 +253,7 @@ export default function ProjectorPage() {
                 {slideImage && slideImagePlacement === "background" && <img src={slideImage} alt="" className="projector-slide-image projector-slide-image-background" />}
                 {slideImage && slideImagePlacement === "inline" && <img src={slideImage} alt="" className="projector-slide-image projector-slide-image-inline" />}
                 <p
+                  key={`${currentSongId}-${safeSlideIndex}`}
                   className={`projector-line ${transitionClass}`}
                   style={lyricStyle}
                 >

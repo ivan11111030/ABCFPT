@@ -65,6 +65,7 @@ export default function ControlPage() {
   const [encodingProfile, setEncodingProfile] = useState<"low" | "medium" | "high" | "ultra">("medium");
   const [isLive, setIsLive] = useState(false);
   const [standby, setStandby] = useState(false);
+  const [rehearsalSeconds, setRehearsalSeconds] = useState<number | null>(null);
   const [background, setBackground] = useState<BackgroundConfig>({ type: "color", value: "#000000", opacity: 100 });
   const [teleprompterFontSize, setTeleprompterFontSize] = useState(42);
   const [streamStatus, setStreamStatus] = useState("");
@@ -310,6 +311,27 @@ export default function ControlPage() {
   const activeSong = useMemo(() => songs.find((song) => song.id === activeSongId) ?? songs[0] ?? EMPTY_SONG, [activeSongId, songs]);
   const activeCamera = useMemo(() => cameras.find((c) => c.id === activeCameraId) ?? cameras[0] ?? { id: "", name: "No Camera", protocol: "", ipAddress: "", streamUrl: "", status: "offline", supportsPTZ: false }, [activeCameraId, cameras]);
   const previewCamera = useMemo(() => cameras.find((c) => c.id === previewCameraId) ?? cameras[1] ?? cameras[0] ?? { id: "", name: "No Camera", protocol: "", ipAddress: "", streamUrl: "", status: "offline", supportsPTZ: false }, [previewCameraId, cameras]);
+
+  useEffect(() => {
+    if (rehearsalSeconds === null || rehearsalSeconds >= 120) return;
+    const timer = window.setInterval(() => {
+      setRehearsalSeconds((seconds) => seconds === null ? null : Math.min(120, seconds + 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [rehearsalSeconds]);
+
+  const startRehearsal = () => {
+    setRehearsalSeconds(0);
+    setStandby(false);
+    triggerScene("worship");
+    socket.emit("display:requestSync");
+  };
+
+  const rehearsalLabel = rehearsalSeconds === null
+    ? "Run 2-minute rehearsal"
+    : rehearsalSeconds >= 120
+      ? "Rehearsal complete"
+      : `Rehearsal ${String(Math.floor(rehearsalSeconds / 60)).padStart(2, "0")}:${String(rehearsalSeconds % 60).padStart(2, "0")}`;
 
   const triggerScene = (scene: SceneMode) => {
     setActiveScene(scene);
@@ -834,6 +856,50 @@ export default function ControlPage() {
         onToggleRightPanel={() => setShowRightPanel((s) => !s)}
       />
 
+      <section className="service-readiness" aria-label="Service readiness">
+        <div className="readiness-heading">
+          <div>
+            <span className="eyebrow">Service runbook</span>
+            <h1>Ready room</h1>
+          </div>
+          <button type="button" className={`button ${rehearsalSeconds !== null && rehearsalSeconds < 120 ? "warning" : "primary"}`} onClick={startRehearsal}>
+            {rehearsalLabel}
+          </button>
+        </div>
+        <div className="readiness-grid">
+          <div className={`readiness-item ${connected ? "ready" : "pending"}`}>
+            <span className="readiness-dot" />
+            <div><strong>Control Center</strong><span>{connected ? "All modules connected" : "Waiting for sync"}</span></div>
+          </div>
+          <div className={`readiness-item ${songs.length > 0 && activeSong.slides.length > 0 ? "ready" : "pending"}`}>
+            <span className="readiness-dot" />
+            <div><strong>Slides & lyrics</strong><span>{songs.length > 0 ? `${songs.length} songs loaded` : "Load a setlist"}</span></div>
+          </div>
+          <div className={`readiness-item ${connected ? "ready" : "pending"}`}>
+            <span className="readiness-dot" />
+            <div><strong>Teleprompter</strong><span>{connected ? "Sync ready" : "Sync pending"}</span></div>
+          </div>
+          <div className={`readiness-item ${cameras.some((camera) => camera.status === "online") ? "ready" : "pending"}`}>
+            <span className="readiness-dot" />
+            <div><strong>Cameras</strong><span>{cameras.filter((camera) => camera.status === "online").length}/{cameras.length} online</span></div>
+          </div>
+          <div className={`readiness-item ${isLive ? "live" : activeCamera.id ? "ready" : "pending"}`}>
+            <span className="readiness-dot" />
+            <div><strong>Livestream</strong><span>{isLive ? "Broadcasting" : activeCamera.id ? "Preview ready" : "Add a camera"}</span></div>
+          </div>
+          <div className="readiness-item pending">
+            <span className="readiness-dot" />
+            <div><strong>Audio monitor</strong><span>Test levels in the right dock</span></div>
+          </div>
+        </div>
+        <div className="quick-actions" aria-label="Quick actions">
+          <span>Fallback visuals</span>
+          <button type="button" className="button subtle" onClick={() => jumpToSection(0)}>Return to Title</button>
+          <button type="button" className="button subtle" onClick={() => jumpToSection(activeSong.slides.length - 1)}>Closing Slide</button>
+          <button type="button" className="button outline" onClick={() => triggerSlide("next")}>Next Visual <kbd>→</kbd></button>
+        </div>
+      </section>
+
       {/* 3-PANEL BODY */}
       <div className="control-body" style={{ gridTemplateColumns: showRightPanel ? `${leftWidth}px 6px 1fr 6px ${rightWidth}px` : `${leftWidth}px 6px 1fr` }}>
         {/* LEFT: SETLIST */}
@@ -976,6 +1042,7 @@ export default function ControlPage() {
             </button>
           </div>
           {!isCameraFullScreen && (
+            <div id="cameras">
             <CameraPreviewPanel
               cameras={cameras}
               activeCameraId={previewCameraId}
@@ -992,23 +1059,26 @@ export default function ControlPage() {
               combined={combinedCameras}
               onToggleCombined={() => setCombinedCameras((current) => !current)}
             />
+            </div>
           )}
           <CameraTransitionPanel transition={cameraTransition} onChangeTransition={changeTransition} />
           <SceneControlPanel activeSceneType={activeSceneType} onSceneChange={triggerSceneType} onEditScene={handleEditScene} onOpenLibrary={() => setShowSceneLibrary(true)} />
-          <LivestreamStudioPanel
-            activeScene={activeScene}
-            activeCamera={activeCamera}
-            transition={cameraTransition}
-            isLive={isLive}
-            streamStatus={streamStatus}
-            onStart={startStream}
-            onStop={stopStream}
-            onToggleOverlay={toggleOverlay}
-            onChangeRtmpUrl={setRtmpUrl}
-            onChangeStreamKey={setStreamKey}
-            encodingProfile={encodingProfile}
-            onChangeEncodingProfile={setEncodingProfile}
-          />
+          <div id="livestream">
+            <LivestreamStudioPanel
+              activeScene={activeScene}
+              activeCamera={activeCamera}
+              transition={cameraTransition}
+              isLive={isLive}
+              streamStatus={streamStatus}
+              onStart={startStream}
+              onStop={stopStream}
+              onToggleOverlay={toggleOverlay}
+              onChangeRtmpUrl={setRtmpUrl}
+              onChangeStreamKey={setStreamKey}
+              encodingProfile={encodingProfile}
+              onChangeEncodingProfile={setEncodingProfile}
+            />
+          </div>
           {/* Standby & Background */}
           <BackgroundPanel
             background={background}
@@ -1021,7 +1091,9 @@ export default function ControlPage() {
             onApplyAsOverlay={(imageUrl) => setCanvaOverlayImage(imageUrl)}
             onApplyAsBackground={(bg) => changeBackground(bg)}
           />
-          <AudioMonitorPanel />
+          <div id="audio">
+            <AudioMonitorPanel />
+          </div>
           <CameraDiscoveryPanel onAddCamera={handleAddCamera} />
           <LocalCameraPanel onAddCamera={handleAddCamera} />
           <MobileCameraInvitePanel />

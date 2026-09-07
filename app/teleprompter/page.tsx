@@ -17,9 +17,30 @@ export default function TeleprompterPage() {
   const [darkMode, setDarkMode] = useState(true);
   const [connected, setConnected] = useState(false);
   const [showNav, setShowNav] = useState(false);
+  const [autoAdvance, setAutoAdvance] = useState(false);
+  const [paceSeconds, setPaceSeconds] = useState(8);
   const [background, setBackground] = useState<BackgroundConfig>({ type: "color", value: "#000000", opacity: 100 });
 
   const song = songs.find((s) => s.id === currentSongId) ?? songs[0];
+
+  useEffect(() => {
+    if (!autoAdvance || !song?.slides.length) return;
+    const timer = window.setInterval(() => {
+      setSlideIndex((current) => {
+        const next = Math.min(song.slides.length - 1, current + 1);
+        if (next !== current) socket.emit("control:slide", next);
+        return next;
+      });
+    }, paceSeconds * 1000);
+    return () => window.clearInterval(timer);
+  }, [autoAdvance, paceSeconds, song]);
+
+  const moveSlide = (direction: -1 | 1) => {
+    if (!song?.slides.length) return;
+    const next = Math.max(0, Math.min(song.slides.length - 1, slideIndex + direction));
+    setSlideIndex(next);
+    socket.emit("control:slide", next);
+  };
 
   useEffect(() => {
     const loadedSongs = songStore.getSongs();
@@ -112,6 +133,22 @@ export default function TeleprompterPage() {
           <span style={{ fontSize: 12, color: connected ? "var(--success)" : "var(--danger)" }}>
             {connected ? "🟢 Synced" : "🔴 Offline"}
           </span>
+          <div className="teleprompter-tools" aria-label="Teleprompter pacing controls">
+            <button type="button" className="button subtle" onClick={() => moveSlide(-1)} aria-label="Previous slide">◀</button>
+            <button type="button" className="button subtle" onClick={() => moveSlide(1)} aria-label="Next slide">▶</button>
+            <label>
+              Pace
+              <select value={paceSeconds} onChange={(event) => setPaceSeconds(Number(event.target.value))}>
+                <option value={5}>5s</option>
+                <option value={8}>8s</option>
+                <option value={12}>12s</option>
+                <option value={20}>20s</option>
+              </select>
+            </label>
+            <button type="button" className={`button ${autoAdvance ? "primary" : "subtle"}`} onClick={() => setAutoAdvance((current) => !current)}>
+              {autoAdvance ? "Auto on" : "Manual"}
+            </button>
+          </div>
           <button onClick={() => setDarkMode((s) => !s)} className="button subtle" style={{ fontSize: 12 }}>
             {darkMode ? "☀️" : "🌙"}
           </button>
@@ -122,7 +159,7 @@ export default function TeleprompterPage() {
 
       <section className="teleprompter-stage" style={{ fontSize }}>
         <div style={{ width: "100%" }}>
-          <p className="teleprompter-current" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", textAlign: currentSlide?.textStyle?.align ?? "center" }}>{currentSlide?.text}</p>
+          <p key={`${currentSongId}-${slideIndex}`} className="teleprompter-current" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", textAlign: currentSlide?.textStyle?.align ?? "center" }}>{currentSlide?.text}</p>
           {nextLine && (
             <p className="teleprompter-next" style={{ textAlign: currentSlide?.textStyle?.align ?? "center" }}>
               Next: {nextLine}

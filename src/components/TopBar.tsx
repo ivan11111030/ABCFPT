@@ -55,10 +55,11 @@ export function TopBar({ title, badge, currentSong, isLive, cameraCount, onlineC
 
   const pathname = usePathname();
   const navItems = [
-    { href: "/control", label: "Control" },
-    { href: "/songs", label: "Songs" },
+    { href: "/control", label: "Slides" },
     { href: "/teleprompter", label: "Teleprompter" },
-    { href: "/projector", label: "Projector" },
+    { href: "/control#cameras", label: "Cameras" },
+    { href: "/control#livestream", label: "Livestream" },
+    { href: "/settings", label: "Settings" },
   ];
 
   return (
@@ -71,7 +72,7 @@ export function TopBar({ title, badge, currentSong, isLive, cameraCount, onlineC
             <Link
               key={item.href}
               href={item.href}
-              className={`topbar-nav-link${pathname === item.href ? " active" : ""}`}
+              className={`topbar-nav-link${pathname === item.href.split("#")[0] && item.href === "/control" || pathname === item.href ? " active" : ""}`}
             >
               {item.label}
             </Link>

@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev:web": "next dev",
-    "dev:server": "ts-node-dev --respawn --transpile-only server/index.ts",
+    "dev:server": "tsx watch server/index.ts",
     "server:start": "tsx server/index.ts",
     "dev": "concurrently \"npm:dev:web\" \"npm:dev:server\"",
     "build": "next build",

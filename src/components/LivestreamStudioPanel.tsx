@@ -39,6 +39,7 @@ export function LivestreamStudioPanel({
 }: LivestreamStudioPanelProps) {
   const [rtmpUrl, setRtmpUrl] = useState("rtmps://live-api-s.facebook.com:443/rtmp/");
   const [streamKey, setStreamKey] = useState("");
+  const [obsPreviewVerified, setObsPreviewVerified] = useState(false);
 
   return (
     <section className="studio-panel">
@@ -59,6 +60,16 @@ export function LivestreamStudioPanel({
       <div className="studio-line">
         <span>Transition</span>
         <strong>{transition}</strong>
+      </div>
+      <div className={`obs-check ${obsPreviewVerified ? "verified" : "pending"}`}>
+        <span className="readiness-dot" />
+        <div>
+          <strong>OBS window capture</strong>
+          <span>{obsPreviewVerified ? "Preview verified" : "Add this app window as an OBS source"}</span>
+        </div>
+        <button type="button" className="button subtle" onClick={() => setObsPreviewVerified((current) => !current)}>
+          {obsPreviewVerified ? "Reset" : "Mark tested"}
+        </button>
       </div>
       <div className="studio-input-group">
         <label htmlFor="rtmp-url">

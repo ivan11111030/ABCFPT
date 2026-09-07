@@ -3,6 +3,15 @@ import type { Slide, Song } from "@/src/types/production";
 
 const SLIDE_FONTS = ["Inter", "Arial", "Georgia", "Merriweather", "Roboto", "Oswald", "Montserrat", "Open Sans"];
 
+function getSlideKind(slide: Slide): "lyrics" | "scripture" | "visual" {
+  if (slide.renderedImage || slide.imageUrl || !slide.text.trim()) return "visual";
+  const searchableText = `${slide.section} ${slide.text}`.toLowerCase();
+  if (/scripture|verse|psalm|genesis|exodus|matthew|mark|luke|john|romans|corinthians|ephesians|revelation/.test(searchableText)) return "scripture";
+  return "lyrics";
+}
+
+const SLIDE_KIND_LABELS = { lyrics: "Lyrics", scripture: "Scripture", visual: "Visual" } as const;
+
 type LyricsPreviewPanelProps = {
   song: Song;
   currentSlide: number;
@@ -135,6 +144,7 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
                 onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onJumpToSlide?.(index); }}
               >
                 <div className="slide-thumbnail-number">{index + 1}</div>
+                <span className={`slide-kind-badge ${getSlideKind(slide)}`}>{SLIDE_KIND_LABELS[getSlideKind(slide)]}</span>
                 {slide.imageUrl && <img src={slide.imageUrl} alt="" className={`slide-card-image slide-card-image-${slide.imagePlacement ?? "foreground"}`} />}
                 <div className="slide-thumbnail-text" style={{ textAlign: slide.textStyle?.align ?? "center" }}>{slide.text}</div>
                 {onUpdateSlide && editControls(slide, index)}
@@ -164,6 +174,7 @@ export function LyricsPreviewPanel({ song, currentSlide, overlayEnabled, onToggl
                 onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onJumpToSlide?.(index); }}
               >
                 <span className="slide-list-number">{index + 1}</span>
+                <span className={`slide-kind-badge ${getSlideKind(slide)}`}>{SLIDE_KIND_LABELS[getSlideKind(slide)]}</span>
                 {slide.imageUrl && <img src={slide.imageUrl} alt="" className={`slide-card-image slide-card-image-${slide.imagePlacement ?? "foreground"}`} />}
                 <span className="slide-list-text" style={{ textAlign: slide.textStyle?.align ?? "center" }}>{slide.text}</span>
                 {onUpdateSlide && editControls(slide, index)}
