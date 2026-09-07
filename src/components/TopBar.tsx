@@ -14,9 +14,11 @@ type TopBarProps = {
   activeScene?: string;
   showRightPanel?: boolean;
   onToggleRightPanel?: () => void;
+  showLeftPanel?: boolean;
+  onToggleLeftPanel?: () => void;
 };
 
-export function TopBar({ title, badge, currentSong, isLive, cameraCount, onlineCameraCount, activeScene, showRightPanel, onToggleRightPanel }: TopBarProps) {
+export function TopBar({ title, badge, currentSong, isLive, cameraCount, onlineCameraCount, activeScene, showRightPanel, onToggleRightPanel, showLeftPanel, onToggleLeftPanel }: TopBarProps) {
   const [elapsed, setElapsed] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -59,6 +61,7 @@ export function TopBar({ title, badge, currentSong, isLive, cameraCount, onlineC
     { href: "/teleprompter", label: "Teleprompter" },
     { href: "/control#cameras", label: "Cameras" },
     { href: "/control#livestream", label: "Livestream" },
+    { href: "/projector", label: "Projector" },
     { href: "/settings", label: "Settings" },
   ];
 
@@ -98,6 +101,11 @@ export function TopBar({ title, badge, currentSong, isLive, cameraCount, onlineC
         <span className="topbar-timer">{isLive ? `${minutes}:${seconds}` : "--:--"}</span>
       </div>
       <div className="topbar-right">
+        {onToggleLeftPanel && (
+          <button type="button" className="button subtle topbar-toggle" onClick={onToggleLeftPanel}>
+            {showLeftPanel ? "Hide Setlist ◀" : "Show Setlist ▶"}
+          </button>
+        )}
         {onToggleRightPanel && (
           <button type="button" className="button subtle topbar-toggle" onClick={onToggleRightPanel}>
             {showRightPanel ? "Hide Panel ◀" : "Show Panel ▶"}

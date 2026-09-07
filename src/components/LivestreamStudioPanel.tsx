@@ -44,7 +44,10 @@ export function LivestreamStudioPanel({
   return (
     <section className="studio-panel">
       <div className="panel-header">
-        <p>Livestream Studio</p>
+        <div>
+          <p>Livestream Studio</p>
+          <span className="panel-purpose">Send the program feed to OBS / RTMP</span>
+        </div>
         <span style={{ fontSize: 12, fontWeight: 700, color: isLive ? "var(--danger)" : "var(--muted)" }}>
           {isLive ? "🔴 LIVE" : "⏸ Standby"}
         </span>

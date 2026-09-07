@@ -29,6 +29,7 @@ export function CameraPreviewPanel({ cameras, activeCameraId, programCameraId, o
       <div className="panel-header camera-panel-header">
         <div>
           <p>Cameras</p>
+          <span className="panel-purpose">Preview, switch, and route camera feeds</span>
           <span className="muted" style={{ fontSize: 12, color: "var(--muted)" }}>{cameras.filter((c) => c.status === "online").length}/{cameras.length} online</span>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>

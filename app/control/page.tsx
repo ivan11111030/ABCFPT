@@ -60,6 +60,7 @@ export default function ControlPage() {
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [connected, setConnected] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [previewSlideIndex, setPreviewSlideIndex] = useState(0);
   const [rtmpUrl, setRtmpUrl] = useState("rtmps://live-api-s.facebook.com:443/rtmp/");
   const [streamKey, setStreamKey] = useState("");
   const [encodingProfile, setEncodingProfile] = useState<"low" | "medium" | "high" | "ultra">("medium");
@@ -74,6 +75,7 @@ export default function ControlPage() {
   const [leftWidth, setLeftWidth] = useState(280);
   const [rightWidth, setRightWidth] = useState(320);
   const [showRightPanel, setShowRightPanel] = useState(true);
+  const [showLeftPanel, setShowLeftPanel] = useState(true);
   const [combinedCameras, setCombinedCameras] = useState(false);
   const [localStreams, setLocalStreams] = useState<Record<string, MediaStream>>({});
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
@@ -138,7 +140,10 @@ export default function ControlPage() {
       setConnected(true);
       if (serverState.songs?.length) songStore.mergeFromServer(serverState.songs);
       if (serverState.currentSongId) setActiveSongId(serverState.currentSongId);
-      if (serverState.currentSlide !== undefined) setCurrentSlide(serverState.currentSlide);
+      if (serverState.currentSlide !== undefined) {
+        setCurrentSlide(serverState.currentSlide);
+        setPreviewSlideIndex(serverState.currentSlide + 1);
+      }
       if (serverState.currentScene) setActiveScene(serverState.currentScene);
       if (serverState.cameras?.length) setCameras(serverState.cameras);
       if (serverState.activeCameraId) setActiveCameraId(serverState.activeCameraId);
@@ -309,6 +314,8 @@ export default function ControlPage() {
 
   const EMPTY_SONG: Song = { id: "", title: "No Song", artist: "", key: "C", tempo: 0, currentSection: "", slides: [{ id: "empty", section: "", text: "" }], favorite: false };
   const activeSong = useMemo(() => songs.find((song) => song.id === activeSongId) ?? songs[0] ?? EMPTY_SONG, [activeSongId, songs]);
+  const safePreviewSlideIndex = Math.min(previewSlideIndex, Math.max(activeSong.slides.length - 1, 0));
+  const nextSlide = activeSong.slides[safePreviewSlideIndex] ?? activeSong.slides[0];
   const activeCamera = useMemo(() => cameras.find((c) => c.id === activeCameraId) ?? cameras[0] ?? { id: "", name: "No Camera", protocol: "", ipAddress: "", streamUrl: "", status: "offline", supportsPTZ: false }, [activeCameraId, cameras]);
   const previewCamera = useMemo(() => cameras.find((c) => c.id === previewCameraId) ?? cameras[1] ?? cameras[0] ?? { id: "", name: "No Camera", protocol: "", ipAddress: "", streamUrl: "", status: "offline", supportsPTZ: false }, [previewCameraId, cameras]);
 
@@ -409,6 +416,7 @@ export default function ControlPage() {
     if (songId === activeSongId) return;
     setActiveSongId(songId);
     setCurrentSlide(0);
+    setPreviewSlideIndex(0);
     socket.emit("control:song", songId);
     socket.emit("control:slide", 0);
   };
@@ -418,6 +426,8 @@ export default function ControlPage() {
   };
 
   const handleTake = () => {
+    setCurrentSlide(safePreviewSlideIndex);
+    socket.emit("control:slide", safePreviewSlideIndex);
     setActiveCameraId(previewCameraId);
     socket.emit("control:camera", previewCameraId);
     setProgramFlash(true);
@@ -745,14 +755,19 @@ export default function ControlPage() {
   };
 
   const triggerSlide = (direction: "previous" | "next") => {
-    const next = Math.max(0, Math.min(activeSong.slides.length - 1, direction === "next" ? currentSlide + 1 : currentSlide - 1));
-    setCurrentSlide(next);
-    socket.emit("control:slide", next);
+    const next = Math.max(0, Math.min(activeSong.slides.length - 1, direction === "next" ? safePreviewSlideIndex + 1 : safePreviewSlideIndex - 1));
+    setPreviewSlideIndex(next);
   };
 
   const jumpToSection = (index: number) => {
-    setCurrentSlide(index);
-    socket.emit("control:slide", index);
+    setPreviewSlideIndex(Math.max(0, Math.min(activeSong.slides.length - 1, index)));
+  };
+
+  const goLiveSlide = (index: number) => {
+    const next = Math.max(0, Math.min(activeSong.slides.length - 1, index));
+    setPreviewSlideIndex(next);
+    setCurrentSlide(next);
+    socket.emit("control:slide", next);
   };
 
   const toggleFullScreen = (target: "lyrics" | "camera") => {
@@ -765,6 +780,7 @@ export default function ControlPage() {
       const nextSongId = songs[currentIndex + 1].id;
       setActiveSongId(nextSongId);
       setCurrentSlide(0);
+      setPreviewSlideIndex(0);
       socket.emit("control:song", nextSongId);
       socket.emit("control:slide", 0);
     }
@@ -854,6 +870,8 @@ export default function ControlPage() {
         activeScene={activeScene}
         showRightPanel={showRightPanel}
         onToggleRightPanel={() => setShowRightPanel((s) => !s)}
+        showLeftPanel={showLeftPanel}
+        onToggleLeftPanel={() => setShowLeftPanel((s) => !s)}
       />
 
       <section className="service-readiness" aria-label="Service readiness">
@@ -894,24 +912,24 @@ export default function ControlPage() {
         </div>
         <div className="quick-actions" aria-label="Quick actions">
           <span>Fallback visuals</span>
-          <button type="button" className="button subtle" onClick={() => jumpToSection(0)}>Return to Title</button>
-          <button type="button" className="button subtle" onClick={() => jumpToSection(activeSong.slides.length - 1)}>Closing Slide</button>
+          <button type="button" className="button subtle" onClick={() => goLiveSlide(0)}>Return to Title</button>
+          <button type="button" className="button subtle" onClick={() => goLiveSlide(activeSong.slides.length - 1)}>Closing Slide</button>
           <button type="button" className="button outline" onClick={() => triggerSlide("next")}>Next Visual <kbd>→</kbd></button>
         </div>
       </section>
 
       {/* 3-PANEL BODY */}
-      <div className="control-body" style={{ gridTemplateColumns: showRightPanel ? `${leftWidth}px 6px 1fr 6px ${rightWidth}px` : `${leftWidth}px 6px 1fr` }}>
+      <div className="control-body" style={{ gridTemplateColumns: `${showLeftPanel ? `${leftWidth}px 6px` : ""} 1fr${showRightPanel ? ` 6px ${rightWidth}px` : ""}` }}>
         {/* LEFT: SETLIST */}
-        <div className="control-left">
+        {showLeftPanel && <div className="control-left">
           <SetlistPanel songs={songs} activeSongId={activeSongId} onSelectSong={selectSong} onReorder={handleReorderSong} />
           <button type="button" className="button outline" style={{ width: "100%", marginTop: 8, fontSize: 12 }} onClick={() => setShowSongManager(true)}>
             ✏️ Edit Songs / Import PPT
           </button>
-        </div>
+        </div>}
 
         {/* LEFT RESIZE HANDLE */}
-        <div className="resize-handle" onMouseDown={(e) => onMouseDown("left", e)} />
+        {showLeftPanel && <div className="resize-handle" onMouseDown={(e) => onMouseDown("left", e)} />}
 
         {/* CENTER: PROGRAM/PREVIEW + LYRICS */}
         <div className="control-center">
@@ -981,8 +999,8 @@ export default function ControlPage() {
                     {overlayEnabled && (
                       <DraggableOverlay position={overlayPos} interactive={false}>
                         <div className="overlay-lyrics">
-                          <p style={{ textAlign: activeSong.slides[currentSlide + 1]?.textStyle?.align ?? "center" }}>{activeSong.slides[currentSlide + 1]?.text ?? "End of song"}</p>
-                          <span className="overlay-section">{previewCamera.name}</span>
+                          <p style={{ textAlign: nextSlide?.textStyle?.align ?? "center" }}>{nextSlide?.text ?? "End of song"}</p>
+                          <span className="overlay-section">NEXT • {previewCamera.name}</span>
                         </div>
                       </DraggableOverlay>
                     )}
@@ -994,8 +1012,8 @@ export default function ControlPage() {
                   </>
                 ) : (
                   <div>
-                    <p>{activeSong.slides[currentSlide + 1]?.text ?? "End of song"}</p>
-                    <p className="camera-name">{previewCamera.name}</p>
+                    <p>{nextSlide?.text ?? "End of song"}</p>
+                    <p className="camera-name">NEXT • {previewCamera.name}</p>
                   </div>
                 )}
               </div>
