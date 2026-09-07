@@ -191,7 +191,6 @@ loadStateSnapshot();
 /* ── FFmpeg RTMP streaming ──────────────────────────── */
 let ffmpegProcess: ChildProcess | null = null;
 let streamTargetUrl: string = "";
-let streamOwnerSocketId: string | null = null;
 
 type EncodingProfileName = "low" | "medium" | "high" | "ultra";
 const ENCODING_PROFILES: Record<EncodingProfileName, { videoBitrate: string; bufsize: string; audioBitrate: string; fps: string }> = {
@@ -213,7 +212,6 @@ function stopFfmpeg() {
     ffmpegProcess = null;
   }
   streamTargetUrl = "";
-  streamOwnerSocketId = null;
 }
 
 function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingProfileName = DEFAULT_ENCODING_PROFILE): { ok: boolean; error?: string } {
@@ -278,21 +276,20 @@ function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingPr
       io.emit("stream:error", { message: `FFmpeg error: ${err.message}` });
       io.emit("stream:stopped", { status: "stopped" });
       ffmpegProcess = null;
-      streamOwnerSocketId = null;
     });
 
-    process.on("close", (code) => {
+    process.on("close", (code, signal) => {
       if (ffmpegProcess !== process) return;
-      console.log(`[FFmpeg] Process exited with code ${code}`);
+      const exitReason = code === null ? `signal ${signal || "unknown"}` : `code ${code}`;
+      console.log(`[FFmpeg] Process exited with ${exitReason}`);
       if (state.isLive) {
         state.isLive = false;
         if (code !== 0) {
-          io.emit("stream:error", { message: lastFfmpegError || `Stream ended unexpectedly (code ${code})` });
+          io.emit("stream:error", { message: lastFfmpegError || `Stream ended unexpectedly (${exitReason})` });
         }
-        io.emit("stream:stopped", { status: "stopped", reason: lastFfmpegError || undefined });
+        io.emit("stream:stopped", { status: "stopped", reason: lastFfmpegError || `Stream ended unexpectedly (${exitReason})` });
       }
       ffmpegProcess = null;
-      streamOwnerSocketId = null;
     });
 
     console.log(`[FFmpeg] Started → ${fullUrl}`);
@@ -681,7 +678,6 @@ io.on("connection", (socket: Socket) => {
       }
 
       state.isLive = true;
-      streamOwnerSocketId = socket.id;
       console.log(`[Stream] Live → ${rtmpUrl}***`);
       io.emit("stream:started", { scene: payload.scene, cameraId: payload.cameraId, status: "live" });
       callback({ ok: true, status: "live" });
@@ -809,14 +805,6 @@ io.on("connection", (socket: Socket) => {
       socketCameraMap.delete(socket.id);
       persistState();
       io.emit("camera:list", state.cameras);
-    }
-
-    // If the disconnecting client was streaming, stop ffmpeg
-    if (state.isLive && ffmpegProcess && streamOwnerSocketId === socket.id) {
-      console.log("[Stream] Streaming client disconnected, stopping ffmpeg");
-      stopFfmpeg();
-      state.isLive = false;
-      io.emit("stream:stopped", { status: "stopped" });
     }
 
     console.log(`Socket disconnected: ${socket.id}`);
