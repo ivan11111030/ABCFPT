@@ -22,6 +22,7 @@ import { SongManagementPanel } from "@/src/components/SongManagementPanel";
 import { DraggableOverlay, OverlayManualControls, LAYOUT_PRESETS, type OverlayLayout, type OverlayPosition } from "@/src/components/DraggableOverlay";
 import { BackgroundPanel } from "@/src/components/BackgroundPanel";
 import { CanvaIntegrationPanel } from "@/src/components/CanvaIntegrationPanel";
+import { ExternalPresentationPanel } from "@/src/components/ExternalPresentationPanel";
 import { getIceServers } from "@/src/lib/realtimeConfig";
 import { createSocketClient } from "@/src/lib/socket";
 import * as camStore from "@/src/lib/cameraStreamStore";
@@ -90,11 +91,17 @@ export default function ControlPage() {
   const isLyricsFullScreen = fullScreenTarget === "lyrics";
   const isCameraFullScreen = fullScreenTarget === "camera";
   const [canvaOverlayImage, setCanvaOverlayImage] = useState<string | null>(null);
+  const [externalPresentationStream, setExternalPresentationStream] = useState<MediaStream | null>(null);
+  const [externalPresentationEnabled, setExternalPresentationEnabled] = useState(false);
+  const [externalPresentationMode, setExternalPresentationMode] = useState<"presentation" | "camera-overlay">("presentation");
+  const [externalCameraPosition, setExternalCameraPosition] = useState({ x: 68, y: 8, width: 28 });
+  const [externalCameraHeight, setExternalCameraHeight] = useState(28);
   const draggingRef = useRef<"left" | "right" | null>(null);
   const startXRef = useRef(0);
   const startWidthRef = useRef(0);
   const programVideoRef = useRef<HTMLVideoElement>(null);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
+  const externalPresentationVideoRef = useRef<HTMLVideoElement>(null);
   const streamCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const animFrameRef = useRef<number>(0);
@@ -533,6 +540,12 @@ export default function ControlPage() {
     }
   }, [previewCameraId, streamByCamera]);
 
+  useEffect(() => {
+    if (externalPresentationVideoRef.current) {
+      externalPresentationVideoRef.current.srcObject = externalPresentationStream;
+    }
+  }, [externalPresentationStream]);
+
   const startStream = () => {
     if (!streamKey.trim()) {
       setStreamStatus("Error: Stream Key is required");
@@ -611,7 +624,10 @@ export default function ControlPage() {
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
       // Draw the camera video
-      if (srcVideo && srcVideo.readyState >= 2) {
+      const externalVideo = externalPresentationVideoRef.current;
+      if (externalPresentationEnabled && externalVideo && externalVideo.readyState >= 2) {
+        ctx.drawImage(externalVideo, 0, 0, WIDTH, HEIGHT);
+      } else if (srcVideo && srcVideo.readyState >= 2) {
         const vw = srcVideo.videoWidth || WIDTH;
         const vh = srcVideo.videoHeight || HEIGHT;
         const scale = Math.min(WIDTH / vw, HEIGHT / vh);
@@ -620,6 +636,16 @@ export default function ControlPage() {
         const dx = (WIDTH - dw) / 2;
         const dy = (HEIGHT - dh) / 2;
         ctx.drawImage(srcVideo, dx, dy, dw, dh);
+      }
+
+      if (externalPresentationEnabled && externalPresentationMode === "camera-overlay" && srcVideo && srcVideo.readyState >= 2) {
+        const cameraX = (externalCameraPosition.x / 100) * WIDTH;
+        const cameraY = (externalCameraPosition.y / 100) * HEIGHT;
+        const cameraWidth = (externalCameraPosition.width / 100) * WIDTH;
+        const cameraHeight = (externalCameraHeight / 100) * HEIGHT;
+        ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+        ctx.fillRect(cameraX - 6, cameraY - 6, cameraWidth + 12, cameraHeight + 12);
+        ctx.drawImage(srcVideo, cameraX, cameraY, cameraWidth, cameraHeight);
       }
 
       // Draw lyrics overlay if enabled
@@ -877,6 +903,7 @@ export default function ControlPage() {
 
   return (
     <div className="control-shell">
+      <video ref={externalPresentationVideoRef} autoPlay muted playsInline className="external-presentation-video" aria-hidden="true" />
       {/* TOP STATUS BAR */}
       <TopBar
         title="ABCF Production"
@@ -1144,6 +1171,23 @@ export default function ControlPage() {
           <CanvaIntegrationPanel
             onApplyAsOverlay={(imageUrl) => setCanvaOverlayImage(imageUrl)}
             onApplyAsBackground={(bg) => changeBackground(bg)}
+          />
+          <ExternalPresentationPanel
+            active={Boolean(externalPresentationStream)}
+            mode={externalPresentationMode}
+            cameraPosition={externalCameraPosition}
+            cameraHeight={externalCameraHeight}
+            onModeChange={setExternalPresentationMode}
+            onCameraPositionChange={setExternalCameraPosition}
+            onCameraHeightChange={setExternalCameraHeight}
+            onStart={(stream) => {
+              setExternalPresentationStream(stream);
+              setExternalPresentationEnabled(true);
+            }}
+            onStop={() => {
+              setExternalPresentationStream(null);
+              setExternalPresentationEnabled(false);
+            }}
           />
           <div id="audio">
             <AudioMonitorPanel />

@@ -313,6 +313,58 @@ h1, h2, h3, p { margin: 0; }
   font-weight: 500;
 }
 
+.external-presentation-video {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.external-presentation-panel {
+  gap: 10px;
+}
+
+.external-presentation-help,
+.external-presentation-status {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.external-presentation-mode,
+.external-camera-controls label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.external-presentation-mode select {
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.external-camera-controls {
+  display: grid;
+  gap: 7px;
+}
+
+.external-camera-controls input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.external-presentation-status {
+  color: var(--success);
+  font-weight: 700;
+}
+
 .card {
   background: var(--card);
   border: 1px solid var(--border);
