@@ -19,7 +19,7 @@ export default function ProjectorPage() {
   const [overlayPos, setOverlayPos] = useState<OverlayPosition>(LAYOUT_PRESETS["lower-third"]);
   const [overlayOpacity, setOverlayOpacity] = useState(100);
   const [overlayHeight, setOverlayHeight] = useState(25);
-  const [projectorFontSize, setProjectorFontSize] = useState(42);
+  const [projectorFontSize, setProjectorFontSize] = useState(60);
   const [hasVideoStream, setHasVideoStream] = useState(false);
   const [connected, setConnected] = useState(false);
   const [standby, setStandby] = useState(false);
@@ -51,7 +51,7 @@ export default function ProjectorPage() {
     fontFamily: slideTextStyle?.fontFamily || undefined,
     fontSize: `${projectorFontSize}px`,
     color: slideTextStyle?.color ?? "#ffffff",
-    textAlign: slideTextStyle?.align ?? "center",
+    textAlign: "center",
     fontWeight: slideTextStyle?.bold === undefined ? 700 : slideTextStyle.bold ? 700 : 400,
     fontStyle: slideTextStyle?.italic ? "italic" : "normal",
   };
@@ -260,7 +260,7 @@ export default function ProjectorPage() {
                   {displayText}
                 </p>
                 {slideImage && slideImagePlacement === "foreground" && <img src={slideImage} alt="" className="projector-slide-image" />}
-                <p className="projector-section" style={{ textAlign: slideTextStyle?.align ?? "center" }}>
+                <p className="projector-section" style={{ textAlign: "center" }}>
                   {displaySection} • {displayTitle}
                 </p>
               </>

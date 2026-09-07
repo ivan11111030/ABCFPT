@@ -26,7 +26,7 @@ type Settings = {
 };
 
 const DEFAULTS: Settings = {
-  fontSize: 42,
+  fontSize: 60,
   fontColor: "#ffffff",
   highContrast: true,
   backgroundTheme: "Deep Ocean",

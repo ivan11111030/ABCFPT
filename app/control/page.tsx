@@ -70,7 +70,7 @@ export default function ControlPage() {
   const [standby, setStandby] = useState(false);
   const [rehearsalSeconds, setRehearsalSeconds] = useState<number | null>(null);
   const [background, setBackground] = useState<BackgroundConfig>({ type: "color", value: "#000000", opacity: 100 });
-  const [teleprompterFontSize, setTeleprompterFontSize] = useState(42);
+  const [teleprompterFontSize, setTeleprompterFontSize] = useState(60);
   const [streamStatus, setStreamStatus] = useState("");
   const [programFlash, setProgramFlash] = useState(false);
   const [showSongManager, setShowSongManager] = useState(false);

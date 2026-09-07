@@ -13,7 +13,7 @@ export default function TeleprompterPage() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [currentSongId, setCurrentSongId] = useState("");
   const [slideIndex, setSlideIndex] = useState(0);
-  const [fontSize, setFontSize] = useState(42);
+  const [fontSize, setFontSize] = useState(60);
   const [darkMode, setDarkMode] = useState(true);
   const [connected, setConnected] = useState(false);
   const [showNav, setShowNav] = useState(false);
