@@ -170,7 +170,7 @@ export default function ControlPage() {
 
     socket.on("stream:stopped", (payload: { reason?: string }) => {
       setIsLive(false);
-      setStreamStatus(payload?.reason ? `Error: ${payload.reason}` : "Stopped");
+      setStreamStatus((current) => payload?.reason ? `Error: ${payload.reason}` : current.startsWith("Error:") ? current : "Stopped");
       // Clean up client-side recording
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
         mediaRecorderRef.current.stop();
@@ -752,9 +752,17 @@ export default function ControlPage() {
       }
     };
 
-    recorder.onerror = () => {
-      setStreamStatus("Error: Recording failed");
-      stopStream();
+    recorder.onerror = (event) => {
+      const recorderError = event.error?.message || "Recording failed";
+      setStreamStatus(`Error: ${recorderError}`);
+      setIsLive(false);
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = 0;
+      }
+      if (recorder.state !== "inactive") recorder.stop();
+      mediaRecorderRef.current = null;
+      socket.emit("stream:stop");
     };
 
     recorder.onstop = () => {

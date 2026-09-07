@@ -191,6 +191,7 @@ loadStateSnapshot();
 /* ── FFmpeg RTMP streaming ──────────────────────────── */
 let ffmpegProcess: ChildProcess | null = null;
 let streamTargetUrl: string = "";
+let streamOwnerSocketId: string | null = null;
 
 type EncodingProfileName = "low" | "medium" | "high" | "ultra";
 const ENCODING_PROFILES: Record<EncodingProfileName, { videoBitrate: string; bufsize: string; audioBitrate: string; fps: string }> = {
@@ -212,6 +213,7 @@ function stopFfmpeg() {
     ffmpegProcess = null;
   }
   streamTargetUrl = "";
+  streamOwnerSocketId = null;
 }
 
 function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingProfileName = DEFAULT_ENCODING_PROFILE): { ok: boolean; error?: string } {
@@ -276,6 +278,7 @@ function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingPr
       io.emit("stream:error", { message: `FFmpeg error: ${err.message}` });
       io.emit("stream:stopped", { status: "stopped" });
       ffmpegProcess = null;
+      streamOwnerSocketId = null;
     });
 
     process.on("close", (code) => {
@@ -289,6 +292,7 @@ function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingPr
         io.emit("stream:stopped", { status: "stopped", reason: lastFfmpegError || undefined });
       }
       ffmpegProcess = null;
+      streamOwnerSocketId = null;
     });
 
     console.log(`[FFmpeg] Started → ${fullUrl}`);
@@ -677,6 +681,7 @@ io.on("connection", (socket: Socket) => {
       }
 
       state.isLive = true;
+      streamOwnerSocketId = socket.id;
       console.log(`[Stream] Live → ${rtmpUrl}***`);
       io.emit("stream:started", { scene: payload.scene, cameraId: payload.cameraId, status: "live" });
       callback({ ok: true, status: "live" });
@@ -807,7 +812,7 @@ io.on("connection", (socket: Socket) => {
     }
 
     // If the disconnecting client was streaming, stop ffmpeg
-    if (state.isLive && ffmpegProcess) {
+    if (state.isLive && ffmpegProcess && streamOwnerSocketId === socket.id) {
       console.log("[Stream] Streaming client disconnected, stopping ffmpeg");
       stopFfmpeg();
       state.isLive = false;
