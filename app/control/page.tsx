@@ -738,15 +738,15 @@ export default function ControlPage() {
 
     // Record and send chunks to server
     const hasAudio = canvasStream.getAudioTracks().length > 0;
-    const mimeType = hasAudio && MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
-          ? "video/webm;codecs=vp9,opus"
-          : MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-            ? "video/webm;codecs=vp9"
-            : hasAudio && MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
-              ? "video/webm;codecs=vp8,opus"
-              : MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
-                ? "video/webm;codecs=vp8"
-                : "video/webm";
+    const mimeType = hasAudio && MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+      ? "video/webm;codecs=vp8,opus"
+      : MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
+        ? "video/webm;codecs=vp8"
+        : "";
+
+    if (!mimeType) {
+      throw new Error("This browser does not support VP8 WebM streaming");
+    }
 
     const recorder = new MediaRecorder(canvasStream, { mimeType, videoBitsPerSecond: 2_500_000 });
 
