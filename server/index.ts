@@ -234,7 +234,8 @@ function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingPr
     const ffmpegInputFormat = inputFormat === "webm" ? "matroska" : inputFormat;
     const args = [
       "-f", ffmpegInputFormat, // input format from MediaRecorder
-      "-fflags", "+genpts",
+      "-analyzeduration", "1M",
+      "-probesize", "1M",
       "-i", "pipe:0",         // read from stdin
       // Video encoding
       "-map", "0:v:0",
