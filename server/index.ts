@@ -214,7 +214,7 @@ function stopFfmpeg() {
   streamTargetUrl = "";
 }
 
-function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingProfileName = DEFAULT_ENCODING_PROFILE): { ok: boolean; error?: string } {
+function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingProfileName = DEFAULT_ENCODING_PROFILE, inputFormat: "webm" | "mp4" = "webm"): { ok: boolean; error?: string } {
   stopFfmpeg(); // clean up previous
 
   const profile = ENCODING_PROFILES[profileName] ?? ENCODING_PROFILES[DEFAULT_ENCODING_PROFILE];
@@ -232,7 +232,7 @@ function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingPr
 
   try {
     const args = [
-      "-f", "webm",           // input format from MediaRecorder
+      "-f", inputFormat,       // input format from MediaRecorder
       "-fflags", "+genpts",
       "-i", "pipe:0",         // read from stdin
       // Video encoding
@@ -655,7 +655,7 @@ io.on("connection", (socket: Socket) => {
   socket.on(
     "stream:start",
     (
-      payload: { rtmpUrl?: string; streamKey?: string; scene?: string; cameraId?: string; profile?: EncodingProfileName },
+      payload: { rtmpUrl?: string; streamKey?: string; scene?: string; cameraId?: string; profile?: EncodingProfileName; inputMimeType?: string },
       callback: (result: { ok: boolean; message?: string; status?: string }) => void
     ) => {
       if (!authGuard()) {
@@ -665,6 +665,7 @@ io.on("connection", (socket: Socket) => {
       const rtmpUrl = payload.rtmpUrl?.trim() || "";
       const streamKey = payload.streamKey?.trim().replace(/^\/+/, "") || "";
       const profile: EncodingProfileName = payload.profile && payload.profile in ENCODING_PROFILES ? payload.profile : DEFAULT_ENCODING_PROFILE;
+      const inputFormat = payload.inputMimeType === "video/mp4" ? "mp4" : "webm";
 
       if (!rtmpUrl || !streamKey) {
         const message = "RTMP URL and Stream Key are required.";
@@ -674,7 +675,7 @@ io.on("connection", (socket: Socket) => {
       }
 
       console.log("[Stream] stream:start request received", { rtmpUrl, cameraId: payload.cameraId, profile });
-      const result = startFfmpeg(rtmpUrl, streamKey, profile);
+      const result = startFfmpeg(rtmpUrl, streamKey, profile, inputFormat);
       if (!result.ok) {
         const message = result.error || "Failed to start stream";
         socket.emit("stream:error", { message });
