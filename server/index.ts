@@ -665,7 +665,7 @@ io.on("connection", (socket: Socket) => {
       const rtmpUrl = payload.rtmpUrl?.trim() || "";
       const streamKey = payload.streamKey?.trim().replace(/^\/+/, "") || "";
       const profile: EncodingProfileName = payload.profile && payload.profile in ENCODING_PROFILES ? payload.profile : DEFAULT_ENCODING_PROFILE;
-      const inputFormat = payload.inputMimeType === "video/mp4" ? "mp4" : "webm";
+      const inputFormat = payload.inputMimeType?.startsWith("video/mp4") ? "mp4" : "webm";
 
       if (!rtmpUrl || !streamKey) {
         const message = "RTMP URL and Stream Key are required.";

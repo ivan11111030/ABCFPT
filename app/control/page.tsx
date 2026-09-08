@@ -581,9 +581,7 @@ export default function ControlPage() {
   const emitStreamStart = () => {
     const normalizedRtmpUrl = rtmpUrl.trim();
     const normalizedStreamKey = streamKey.trim().replace(/^\/+/, "");
-    const inputMimeType = MediaRecorder.isTypeSupported("video/mp4;codecs=avc1.42E01E,mp4a.40.2")
-      ? "video/mp4"
-      : "video/webm";
+    const inputMimeType = "video/webm";
 
     if (!normalizedStreamKey) {
       setStreamStatus("Error: Stream Key is required");
@@ -740,11 +738,7 @@ export default function ControlPage() {
 
     // Record and send chunks to server
     const hasAudio = canvasStream.getAudioTracks().length > 0;
-    const mimeType = hasAudio && MediaRecorder.isTypeSupported("video/mp4;codecs=avc1.42E01E,mp4a.40.2")
-      ? "video/mp4;codecs=avc1.42E01E,mp4a.40.2"
-      : !hasAudio && MediaRecorder.isTypeSupported("video/mp4;codecs=avc1.42E01E")
-        ? "video/webm"
-        : hasAudio && MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
+    const mimeType = hasAudio && MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
           ? "video/webm;codecs=vp9,opus"
           : MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
             ? "video/webm;codecs=vp9"
