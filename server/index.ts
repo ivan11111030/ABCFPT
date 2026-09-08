@@ -290,9 +290,12 @@ function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingPr
       if (state.isLive) {
         state.isLive = false;
         if (code !== 0) {
-          io.emit("stream:error", { message: diagnostic || `Stream ended unexpectedly (${exitReason})` });
+          const message = diagnostic || `Stream ended unexpectedly (${exitReason})`;
+          io.emit("stream:error", { message });
+          io.emit("stream:stopped", { status: "stopped", reason: message });
+        } else {
+          io.emit("stream:stopped", { status: "stopped" });
         }
-        io.emit("stream:stopped", { status: "stopped", reason: diagnostic || `Stream ended unexpectedly (${exitReason})` });
       }
       ffmpegProcess = null;
     });
