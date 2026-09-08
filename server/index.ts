@@ -286,7 +286,10 @@ function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingPr
       if (ffmpegProcess !== process) return;
       const exitReason = code === null ? `signal ${signal || "unknown"}` : `code ${code}`;
       console.log(`[FFmpeg] Process exited with ${exitReason}`);
-      const diagnostic = [...ffmpegLog].reverse().find((line) => /error|failed|denied|refused|invalid|unauthorized|forbidden|fatal/i.test(line)) || ffmpegLog[ffmpegLog.length - 1];
+      const diagnostic = [...ffmpegLog].reverse().find((line) =>
+        /error|failed|denied|refused|invalid|unauthorized|forbidden|fatal/i.test(line)
+        && !/^(alpha_mode|encoder|Stream mapping|Press \[q\])/i.test(line)
+      );
       if (state.isLive) {
         state.isLive = false;
         if (code !== 0) {
