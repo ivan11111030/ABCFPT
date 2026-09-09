@@ -1,9 +1,12 @@
 import express, { type Request, type Response } from "express";
 import http from "http";
+import net from "net";
 import fs from "fs";
 import path from "path";
 import { spawn, type ChildProcess } from "child_process";
+import tls from "tls";
 import { Server, type Socket } from "socket.io";
+import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import ffmpegStatic from "ffmpeg-static";
 import { isAuthEnforced, authInitError, verifyIdToken } from "./auth";
 
@@ -13,7 +16,7 @@ import { isAuthEnforced, authInitError, verifyIdToken } from "./auth";
 // `apt-get install ffmpeg`. Falls back to the "ffmpeg" on PATH (e.g. for
 // local dev where it's installed via Homebrew/apt) if the static binary
 // couldn't be resolved for some reason.
-const FFMPEG_PATH = ffmpegStatic || "ffmpeg";
+const FFMPEG_PATH = ffmpegInstaller.path || ffmpegStatic || "ffmpeg";
 
 const app = express();
 const port = Number(process.env.PORT) || 4000;
@@ -191,6 +194,38 @@ loadStateSnapshot();
 /* ── FFmpeg RTMP streaming ──────────────────────────── */
 let ffmpegProcess: ChildProcess | null = null;
 let streamTargetUrl: string = "";
+let rtmpsTarget: URL | null = null;
+let rtmpsProxyPort = 0;
+
+const rtmpsProxyReady = new Promise<number>((resolve, reject) => {
+  const proxy = net.createServer((client) => {
+    const target = rtmpsTarget;
+    if (!target) {
+      client.destroy();
+      return;
+    }
+
+    const secureSocket = tls.connect({
+      host: target.hostname,
+      port: Number(target.port) || 443,
+      servername: target.hostname,
+    });
+    client.pipe(secureSocket);
+    secureSocket.pipe(client);
+    client.on("error", () => secureSocket.destroy());
+    secureSocket.on("error", () => client.destroy());
+  });
+  proxy.once("error", reject);
+  proxy.listen(0, "127.0.0.1", () => {
+    const address = proxy.address();
+    if (!address || typeof address === "string") {
+      reject(new Error("Unable to start RTMPS relay"));
+      return;
+    }
+    rtmpsProxyPort = address.port;
+    resolve(address.port);
+  });
+});
 
 type EncodingProfileName = "low" | "medium" | "high" | "ultra";
 const ENCODING_PROFILES: Record<EncodingProfileName, { videoBitrate: string; bufsize: string; audioBitrate: string; fps: string }> = {
@@ -219,13 +254,14 @@ type StreamErrorCode =
   | "LIVE-INPUT-001"
   | "LIVE-RTMP-001"
   | "LIVE-FFMPEG-001"
+  | "LIVE-FFMPEG-002"
   | "LIVE-RTMP-002"
   | "LIVE-STREAM-001"
   | "LIVE-STREAM-002";
 
 type StreamStartResult = { ok: boolean; error?: string; code?: StreamErrorCode };
 
-function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingProfileName = DEFAULT_ENCODING_PROFILE, inputFormat: "webm" | "mp4" = "webm"): StreamStartResult {
+async function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingProfileName = DEFAULT_ENCODING_PROFILE, inputFormat: "webm" | "mp4" = "webm"): Promise<StreamStartResult> {
   stopFfmpeg(); // clean up previous
 
   const profile = ENCODING_PROFILES[profileName] ?? ENCODING_PROFILES[DEFAULT_ENCODING_PROFILE];
@@ -243,6 +279,15 @@ function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingPr
 
   try {
     const ffmpegInputFormat = inputFormat === "webm" ? "matroska" : inputFormat;
+    let outputUrl = fullUrl;
+    if (fullUrl.startsWith("rtmps://")) {
+      rtmpsTarget = new URL(fullUrl);
+      const proxyPort = await rtmpsProxyReady;
+      outputUrl = `rtmp://127.0.0.1:${proxyPort}${rtmpsTarget.pathname}${rtmpsTarget.search}`;
+      console.log(`[RTMPS] Relaying FFmpeg output through local TLS proxy → ${rtmpsTarget.hostname}:${rtmpsTarget.port || 443}`);
+    } else {
+      rtmpsTarget = null;
+    }
     const args = [
       "-f", ffmpegInputFormat, // input format from MediaRecorder
       "-analyzeduration", "1M",
@@ -268,7 +313,7 @@ function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingPr
       // Output
       "-f", "flv",
       "-flvflags", "no_duration_filesize",
-      fullUrl,
+      outputUrl,
     ];
 
     const process = spawn(FFMPEG_PATH, args, { stdio: ["pipe", "pipe", "pipe"] });
@@ -307,8 +352,9 @@ function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingPr
         state.isLive = false;
         if (code !== 0) {
           const message = diagnostic || `Stream ended unexpectedly (${exitReason})`;
-          io.emit("stream:error", { code: "LIVE-RTMP-002", message });
-          io.emit("stream:stopped", { status: "stopped", code: "LIVE-RTMP-002", reason: message });
+          const errorCode = signal ? "LIVE-FFMPEG-002" : "LIVE-RTMP-002";
+          io.emit("stream:error", { code: errorCode, message });
+          io.emit("stream:stopped", { status: "stopped", code: errorCode, reason: message });
         } else {
           io.emit("stream:stopped", { status: "stopped" });
         }
@@ -673,7 +719,7 @@ io.on("connection", (socket: Socket) => {
   /* ── Stream events ───────────────────────────────── */
   socket.on(
     "stream:start",
-    (
+    async (
       payload: { rtmpUrl?: string; streamKey?: string; scene?: string; cameraId?: string; profile?: EncodingProfileName; inputMimeType?: string },
       callback: (result: { ok: boolean; message?: string; status?: string }) => void
     ) => {
@@ -694,7 +740,7 @@ io.on("connection", (socket: Socket) => {
       }
 
       console.log("[Stream] stream:start request received", { rtmpUrl, cameraId: payload.cameraId, profile });
-      const result = startFfmpeg(rtmpUrl, streamKey, profile, inputFormat);
+      const result = await startFfmpeg(rtmpUrl, streamKey, profile, inputFormat);
       if (!result.ok) {
         const message = result.error || "Failed to start stream";
         socket.emit("stream:error", { code: result.code || "LIVE-STREAM-001", message });
