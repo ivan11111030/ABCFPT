@@ -172,9 +172,9 @@ export default function ControlPage() {
 
     socket.on("display:teleprompterFontSize", (size: number) => setTeleprompterFontSize(size));
 
-    socket.on("stream:stopped", (payload: { reason?: string }) => {
+    socket.on("stream:stopped", (payload: { code?: string; reason?: string }) => {
       setIsLive(false);
-      setStreamStatus((current) => payload?.reason ? `Error: ${payload.reason}` : current.startsWith("Error:") ? current : "Stopped");
+      setStreamStatus((current) => payload?.reason ? `Error [${payload.code || "LIVE-RTMP-002"}]: ${payload.reason}` : current.startsWith("Error") ? current : "Stopped");
       // Clean up client-side recording
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
         mediaRecorderRef.current.stop();

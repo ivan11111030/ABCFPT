@@ -220,7 +220,8 @@ type StreamErrorCode =
   | "LIVE-RTMP-001"
   | "LIVE-FFMPEG-001"
   | "LIVE-RTMP-002"
-  | "LIVE-STREAM-001";
+  | "LIVE-STREAM-001"
+  | "LIVE-STREAM-002";
 
 type StreamStartResult = { ok: boolean; error?: string; code?: StreamErrorCode };
 
@@ -713,10 +714,12 @@ io.on("connection", (socket: Socket) => {
   socket.on("stream:data", (chunk: Buffer | ArrayBuffer) => {
     if (!authGuard()) return;
     if (!ffmpegProcess || !ffmpegProcess.stdin?.writable) {
-      if (!streamDataWarningSent) {
+      // FFmpeg can exit before the browser's already-buffered recorder chunks
+      // arrive. Its close handler emits the real diagnostic; do not replace it
+      // with a misleading "encoder not ready" message here.
+      if (state.isLive && !streamDataWarningSent) {
         streamDataWarningSent = true;
-        console.warn("[Stream] Dropping stream data: ffmpeg not ready [LIVE-STREAM-002]");
-        socket.emit("stream:error", { code: "LIVE-STREAM-002", message: "Encoder is not ready to receive video data." });
+        console.warn("[Stream] Dropping late stream data: encoder is no longer available [LIVE-STREAM-002]");
       }
       return;
     }
