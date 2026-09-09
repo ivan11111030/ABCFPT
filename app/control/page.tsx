@@ -144,6 +144,10 @@ export default function ControlPage() {
 
     socket.on("connect", () => setConnected(true));
     socket.on("disconnect", () => setConnected(false));
+    socket.on("connect_error", (error: Error) => {
+      setConnected(false);
+      setStreamStatus(`Error [LIVE-SOCKET-003]: ${error.message || "Socket connection failed"}`);
+    });
 
     // Full state sync from server on connect
     socket.on("state:sync", (serverState: any) => {
@@ -185,8 +189,8 @@ export default function ControlPage() {
       setIsLive(true);
       setStreamStatus("Live");
     });
-    socket.on("stream:error", (err: { message: string }) => {
-      setStreamStatus(`Error: ${err.message}`);
+    socket.on("stream:error", (err: { code?: string; message: string }) => {
+      setStreamStatus(`Error [${err.code || "LIVE-STREAM-001"}]: ${err.message}`);
       setIsLive(false);
       // Clean up client-side recording on server error
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
@@ -299,6 +303,7 @@ export default function ControlPage() {
       unsubscribeSongStore();
       socket.off("connect");
       socket.off("disconnect");
+      socket.off("connect_error");
       socket.off("state:sync");
       socket.off("control:slide");
       socket.off("control:song");
@@ -557,19 +562,19 @@ export default function ControlPage() {
 
   const startStream = () => {
     if (!streamKey.trim()) {
-      setStreamStatus("Error: Stream Key is required");
+      setStreamStatus("Error [LIVE-INPUT-001]: Stream Key is required");
       return;
     }
 
     // Check socket connection
     if (!socket.connected) {
-      setStreamStatus("Error: Socket not connected to server. Reconnecting...");
+      setStreamStatus("Error [LIVE-SOCKET-001]: Socket not connected to server. Reconnecting...");
       socket.once("connect", () => {
         setStreamStatus("Connected. Starting stream...");
         emitStreamStart();
       });
       socket.once("connect_error", () => {
-        setStreamStatus("Error: Cannot connect to server. Check your connection.");
+        setStreamStatus("Error [LIVE-SOCKET-002]: Cannot connect to server. Check your connection.");
       });
       socket.connect();
       return;
@@ -584,7 +589,7 @@ export default function ControlPage() {
     const inputMimeType = "video/webm";
 
     if (!normalizedStreamKey) {
-      setStreamStatus("Error: Stream Key is required");
+      setStreamStatus("Error [LIVE-INPUT-001]: Stream Key is required");
       return;
     }
 
@@ -593,9 +598,9 @@ export default function ControlPage() {
     socket.emit(
       "stream:start",
       { rtmpUrl: normalizedRtmpUrl, streamKey: normalizedStreamKey, scene: activeScene, cameraId: activeCameraId, inputMimeType },
-      (response: { ok: boolean; message?: string; status?: string }) => {
+      (response: { ok: boolean; code?: string; message?: string; status?: string }) => {
         if (!response || !response.ok) {
-          setStreamStatus(`Error: ${response?.message || "Failed to start stream"}`);
+          setStreamStatus(`Error [${response?.code || "LIVE-STREAM-001"}]: ${response?.message || "Failed to start stream"}`);
           return;
         }
 
@@ -604,7 +609,7 @@ export default function ControlPage() {
           startRecording();
         } catch (error) {
           const message = error instanceof Error ? error.message : "Unable to start browser recorder";
-          setStreamStatus(`Error: ${message}`);
+          setStreamStatus(`Error [LIVE-RECORDER-001]: ${message}`);
           socket.emit("stream:stop");
         }
       }
@@ -760,7 +765,7 @@ export default function ControlPage() {
 
     recorder.onerror = (event) => {
       const recorderError = event.error?.message || "Recording failed";
-      setStreamStatus(`Error: ${recorderError}`);
+      setStreamStatus(`Error [LIVE-RECORDER-002]: ${recorderError}`);
       setIsLive(false);
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current);

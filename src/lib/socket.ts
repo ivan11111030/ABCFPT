@@ -24,8 +24,11 @@ export const createSocketClient = (): Socket => {
   console.log("[Socket] Connecting to:", serverUrl);
 
   socket = io(serverUrl, {
-    // Start with polling and then upgrade to WebSocket where possible.
-    transports: ["polling", "websocket"],
+    // Keep the control connection on polling. Render's proxy can accept the
+    // initial handshake but intermittently fails the WebSocket upgrade, which
+    // makes the live button report a connection error even though the server
+    // is healthy. Stream chunks are small enough for Socket.IO polling.
+    transports: ["polling"],
     autoConnect: true,
     reconnection: true,
     reconnectionAttempts: Infinity,
@@ -33,8 +36,8 @@ export const createSocketClient = (): Socket => {
     reconnectionDelayMax: 5000,
     timeout: 20000,
     withCredentials: false,
-    upgrade: true, // Allow transport upgrade from polling to websocket
-    rememberUpgrade: true, // Remember the upgrade for next connection
+    upgrade: false,
+    rememberUpgrade: false,
   });
 
   const client = socket;

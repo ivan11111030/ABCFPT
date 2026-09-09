@@ -214,7 +214,17 @@ function stopFfmpeg() {
   streamTargetUrl = "";
 }
 
-function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingProfileName = DEFAULT_ENCODING_PROFILE, inputFormat: "webm" | "mp4" = "webm"): { ok: boolean; error?: string } {
+type StreamErrorCode =
+  | "LIVE-AUTH-001"
+  | "LIVE-INPUT-001"
+  | "LIVE-RTMP-001"
+  | "LIVE-FFMPEG-001"
+  | "LIVE-RTMP-002"
+  | "LIVE-STREAM-001";
+
+type StreamStartResult = { ok: boolean; error?: string; code?: StreamErrorCode };
+
+function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingProfileName = DEFAULT_ENCODING_PROFILE, inputFormat: "webm" | "mp4" = "webm"): StreamStartResult {
   stopFfmpeg(); // clean up previous
 
   const profile = ENCODING_PROFILES[profileName] ?? ENCODING_PROFILES[DEFAULT_ENCODING_PROFILE];
@@ -227,7 +237,7 @@ function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingPr
 
   // Validate URL format
   if (!fullUrl.startsWith("rtmp://") && !fullUrl.startsWith("rtmps://")) {
-    return { ok: false, error: "Invalid RTMP URL — must start with rtmp:// or rtmps://" };
+    return { ok: false, code: "LIVE-RTMP-001", error: "Invalid RTMP URL — must start with rtmp:// or rtmps://" };
   }
 
   try {
@@ -279,7 +289,7 @@ function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingPr
       if (ffmpegProcess !== process) return;
       console.error("[FFmpeg] Process error:", err.message);
       state.isLive = false;
-      io.emit("stream:error", { message: `FFmpeg error: ${err.message}` });
+      io.emit("stream:error", { code: "LIVE-FFMPEG-001", message: `FFmpeg error: ${err.message}` });
       io.emit("stream:stopped", { status: "stopped" });
       ffmpegProcess = null;
     });
@@ -296,8 +306,8 @@ function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingPr
         state.isLive = false;
         if (code !== 0) {
           const message = diagnostic || `Stream ended unexpectedly (${exitReason})`;
-          io.emit("stream:error", { message });
-          io.emit("stream:stopped", { status: "stopped", reason: message });
+          io.emit("stream:error", { code: "LIVE-RTMP-002", message });
+          io.emit("stream:stopped", { status: "stopped", code: "LIVE-RTMP-002", reason: message });
         } else {
           io.emit("stream:stopped", { status: "stopped" });
         }
@@ -309,7 +319,7 @@ function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: EncodingPr
     return { ok: true };
   } catch (err: any) {
     console.error("[FFmpeg] Failed to spawn:", err);
-    return { ok: false, error: err.message || "Failed to start ffmpeg" };
+    return { ok: false, code: "LIVE-FFMPEG-001", error: err.message || "Failed to start ffmpeg" };
   }
 }
 
@@ -458,7 +468,7 @@ io.on("connection", (socket: Socket) => {
   // phones and displays legitimately need to be able to send.
   const authGuard = (): boolean => {
     if (!socket.data.authenticated) {
-      socket.emit("auth:required", { message: "Sign in required to control the stream." });
+      socket.emit("auth:required", { code: "LIVE-AUTH-001", message: "Sign in required to control the stream." });
       return false;
     }
     return true;
@@ -667,7 +677,7 @@ io.on("connection", (socket: Socket) => {
       callback: (result: { ok: boolean; message?: string; status?: string }) => void
     ) => {
       if (!authGuard()) {
-        callback({ ok: false, message: "Sign in required to control the stream." });
+        callback({ ok: false, code: "LIVE-AUTH-001", message: "Sign in required to control the stream." } as { ok: false; message: string; code: StreamErrorCode });
         return;
       }
       const rtmpUrl = payload.rtmpUrl?.trim() || "";
@@ -677,8 +687,8 @@ io.on("connection", (socket: Socket) => {
 
       if (!rtmpUrl || !streamKey) {
         const message = "RTMP URL and Stream Key are required.";
-        socket.emit("stream:error", { message });
-        callback({ ok: false, message });
+        socket.emit("stream:error", { code: "LIVE-INPUT-001", message });
+        callback({ ok: false, code: "LIVE-INPUT-001", message } as { ok: false; message: string; code: StreamErrorCode });
         return;
       }
 
@@ -686,8 +696,8 @@ io.on("connection", (socket: Socket) => {
       const result = startFfmpeg(rtmpUrl, streamKey, profile, inputFormat);
       if (!result.ok) {
         const message = result.error || "Failed to start stream";
-        socket.emit("stream:error", { message });
-        callback({ ok: false, message });
+        socket.emit("stream:error", { code: result.code || "LIVE-STREAM-001", message });
+        callback({ ok: false, code: result.code || "LIVE-STREAM-001", message } as { ok: false; message: string; code: StreamErrorCode });
         return;
       }
 
@@ -699,12 +709,18 @@ io.on("connection", (socket: Socket) => {
   );
 
   // Binary video data from client MediaRecorder
+  let streamDataWarningSent = false;
   socket.on("stream:data", (chunk: Buffer | ArrayBuffer) => {
     if (!authGuard()) return;
     if (!ffmpegProcess || !ffmpegProcess.stdin?.writable) {
-      console.warn("[Stream] Dropping stream data: ffmpeg not ready");
+      if (!streamDataWarningSent) {
+        streamDataWarningSent = true;
+        console.warn("[Stream] Dropping stream data: ffmpeg not ready [LIVE-STREAM-002]");
+        socket.emit("stream:error", { code: "LIVE-STREAM-002", message: "Encoder is not ready to receive video data." });
+      }
       return;
     }
+    streamDataWarningSent = false;
     try {
       const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
       ffmpegProcess.stdin.write(buf);
