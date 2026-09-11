@@ -16,7 +16,7 @@ import { isAuthEnforced, authInitError, verifyIdToken } from "./auth";
 // `apt-get install ffmpeg`. Falls back to the "ffmpeg" on PATH (e.g. for
 // local dev where it's installed via Homebrew/apt) if the static binary
 // couldn't be resolved for some reason.
-const FFMPEG_PATH = ffmpegInstaller.path || ffmpegStatic || "ffmpeg";
+const FFMPEG_PATH = ffmpegStatic || ffmpegInstaller.path || "ffmpeg";
 
 const app = express();
 const port = Number(process.env.PORT) || 4000;
@@ -298,6 +298,8 @@ async function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: Enco
       "-c:v", "libx264",
       "-preset", "veryfast",
       "-tune", "zerolatency",
+      "-profile:v", "main",
+      "-level", "4.1",
       "-threads", "1",
       "-b:v", profile.videoBitrate,
       "-maxrate", profile.videoBitrate,
@@ -312,6 +314,8 @@ async function startFfmpeg(rtmpUrl: string, streamKey: string, profileName: Enco
       "-ar", "44100",
       // Output
       "-f", "flv",
+      "-muxdelay", "0",
+      "-muxpreload", "0",
       "-flvflags", "no_duration_filesize",
       outputUrl,
     ];

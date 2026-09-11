@@ -780,8 +780,7 @@ export default function ControlPage() {
       canvasStream.getTracks().forEach((track) => track.stop());
     };
 
-    // Send a chunk every 250ms for low latency
-    recorder.start(250);
+    recorder.start(1000);
     mediaRecorderRef.current = recorder;
     setStreamStatus("Live");
   };
