@@ -1,0 +1,13 @@
+{
+  "name": "ABCF Production Team",
+  "short_name": "ABCFPT",
+  "description": "Church production platform for livestream, lyrics, and singer teleprompter coordination.",
+  "start_url": "/ABCFPT/control",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "landscape",
+  "categories": ["productivity", "music"],
+  "screenshots": [],
+  "icons": []
+}
